@@ -1,0 +1,101 @@
+@startuml
+title TunSociety - Use Case Diagram
+
+left to right direction
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+actor "Guest User" as Guest
+actor "Authenticated User" as Member
+actor "Moderator" as Moderator
+actor "Admin" as Admin
+actor "Ollama Local API" as Ollama
+
+rectangle "TunSociety Platform\nAngular Frontend + ASP.NET Core API" {
+  package "Access" {
+    usecase "Register Account" as UC_Register
+    usecase "Log In" as UC_Login
+  }
+
+  package "User Space" {
+    usecase "Manage Profile" as UC_Profile
+    usecase "Upload Avatar" as UC_Avatar
+    usecase "Search Members" as UC_Search
+    usecase "View Feed" as UC_Feed
+    usecase "Create / Update / Delete Post" as UC_Post
+    usecase "Comment On Post" as UC_Comment
+    usecase "React To Post" as UC_React
+    usecase "Manage Friend Requests" as UC_FriendRequest
+    usecase "Send Direct Message" as UC_DirectMessage
+    usecase "View / Read Notifications" as UC_Notifications
+  }
+
+  package "Moderation" {
+    usecase "Submit Text For Moderation" as UC_SubmitModeration
+    usecase "Classify Text Content" as UC_Classify
+    usecase "Receive Moderation Feedback" as UC_Feedback
+    usecase "Review Flagged Content" as UC_ReviewFlagged
+    usecase "View Warnings And Freezes" as UC_ViewSanctions
+    usecase "Review Appeals" as UC_ReviewAppeals
+    usecase "Accept / Reject Appeal" as UC_AppealDecision
+  }
+
+  package "Administration" {
+    usecase "View Admin Dashboard" as UC_AdminDashboard
+    usecase "View Statistics Overview" as UC_Statistics
+    usecase "Manage User Risk Profile" as UC_UserRisk
+    usecase "Issue Warning" as UC_IssueWarning
+    usecase "Freeze / Unfreeze Account" as UC_Freeze
+    usecase "Review Moderation Decision" as UC_ReviewDecision
+    usecase "View Audit And Activity Logs" as UC_Audit
+  }
+}
+
+Guest -- UC_Register
+Guest -- UC_Login
+
+Member -- UC_Profile
+Member -- UC_Avatar
+Member -- UC_Search
+Member -- UC_Feed
+Member -- UC_Post
+Member -- UC_Comment
+Member -- UC_React
+Member -- UC_FriendRequest
+Member -- UC_DirectMessage
+Member -- UC_Notifications
+Member -- UC_Feedback
+
+UC_Register .> UC_SubmitModeration : <<include>>
+UC_Profile .> UC_SubmitModeration : <<include>>
+UC_Post .> UC_SubmitModeration : <<include>>
+UC_Comment .> UC_SubmitModeration : <<include>>
+UC_FriendRequest .> UC_SubmitModeration : <<include>>
+UC_DirectMessage .> UC_SubmitModeration : <<include>>
+UC_SubmitModeration .> UC_Classify : <<include>>
+UC_SubmitModeration .> UC_Feedback : <<extend>>
+
+Moderator -- UC_ReviewFlagged
+Moderator -- UC_ViewSanctions
+Moderator -- UC_ReviewAppeals
+Moderator -- UC_AppealDecision
+
+Admin -- UC_AdminDashboard
+Admin -- UC_Statistics
+Admin -- UC_UserRisk
+Admin -- UC_IssueWarning
+Admin -- UC_Freeze
+Admin -- UC_ReviewDecision
+Admin -- UC_Audit
+Admin -- UC_ReviewFlagged
+Admin -- UC_ViewSanctions
+Admin -- UC_ReviewAppeals
+Admin -- UC_AppealDecision
+
+UC_ReviewAppeals .> UC_AppealDecision : <<include>>
+UC_ReviewDecision .> UC_IssueWarning : <<extend>>
+UC_ReviewDecision .> UC_Freeze : <<extend>>
+
+Ollama -- UC_Classify
+@enduml

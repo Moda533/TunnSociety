@@ -1,0 +1,141 @@
+\section{Evaluation Approach}
+
+The evaluation of TunSociety was carried out through scenario-based functional verification. Since the project is a full-stack application, the evaluation focused on whether the implemented modules work together correctly from the user's point of view and whether the backend preserves the expected rules for authentication, authorization, persistence, and moderation.
+
+The evaluation considered four main categories:
+
+\begin{itemize}
+    \item user scenarios, including registration, login, profile consultation, profile update, feed usage, reactions, comments, friend requests, notifications, and direct messaging;
+    \item security and access-control scenarios, including protected dashboard access, moderator routes, administrator routes, JWT authentication, and failed login behavior;
+    \item moderation scenarios, including AI scoring, allowed content, flagged content, blocked content, fallback rules, and moderation result review;
+    \item administration scenarios, including overview indicators, audit logs, user risk summaries, warnings, freezes, unfreezing, and appeal supervision.
+\end{itemize}
+
+This evaluation method is adapted to the scope of the project because it verifies the complete user workflow rather than isolated code fragments only.
+
+\section{Evaluation Scenarios}
+
+The following scenarios were used to reason about the functional completeness of the platform.
+
+\begin{longtable}{|m{3.8cm}|m{5.2cm}|m{5.2cm}|}
+\hline
+\textbf{Scenario} & \textbf{Expected behavior} & \textbf{Evaluation result} \\
+\hline
+Register a valid user & The system creates the account, hashes the password, assigns the user role, and returns an authentication token. & Supported by the authentication module. \\
+\hline
+Reject weak registration & The system rejects missing fields, invalid age, invalid gender, weak password, or mismatched confirmation. & Supported through backend validation. \\
+\hline
+Protect user dashboard & Unauthenticated visitors should not access dashboard pages. & Supported through Angular guards and backend JWT validation. \\
+\hline
+Create and interact with posts & A user can publish a post, comment on it, and react to it. & Supported through the community API and feed page. \\
+\hline
+Manage friend request lifecycle & A user can send a request, and the recipient can accept or decline it. & Supported through friend request endpoints and dashboard pages. \\
+\hline
+Exchange direct messages & Users can send messages, view conversations, and update read state. & Supported through direct message APIs and messenger page. \\
+\hline
+Review flagged content & Moderators can consult content that requires review with score, flags, reason, and action. & Supported through moderation endpoints and protected moderation screen. \\
+\hline
+Inspect user risk & Administrators can consult a user's risk summary and related moderation data. & Supported through administration endpoints. \\
+\hline
+Issue and review sanctions & Administrators can issue warnings, freeze accounts, unfreeze accounts, and supervise appeals. & Supported through administration and moderation workflows. \\
+\hline
+\caption{Evaluation scenarios}\\
+\end{longtable}
+
+\section{Functional Results}
+
+The implemented platform satisfies the main functional requirements defined in the analysis chapter. Users can create accounts, authenticate, navigate through the dashboard, manage profiles, publish posts, comment, react, search for members, manage friend requests, exchange direct messages, and consult notifications. These features form the social interaction layer of TunSociety.
+
+The moderator and administrator features also provide the governance layer of the application. Moderators can access protected moderation screens and review moderation-related information. Administrators can consult platform indicators, inspect users, review audit logs, issue warnings, freeze or unfreeze accounts, review moderation results, and supervise appeals.
+
+\begin{longtable}{|m{4.5cm}|m{9.8cm}|}
+\hline
+\textbf{Feature area} & \textbf{Observed result} \\
+\hline
+Authentication & Registration, login, JWT token generation, password hashing, password validation, administrator account handling, and failed-login lockout are implemented. \\
+\hline
+Community feed & Posts, comments, reactions, visibility fields, and author information are persisted and exposed through backend APIs. \\
+\hline
+Network management & Search and friend request workflows allow users to discover members and manage social connections. \\
+\hline
+Messaging & Direct conversations, message persistence, unread counters, and read-state updates are implemented. \\
+\hline
+Notifications & User notifications and navigation badges support activity awareness across the application. \\
+\hline
+Moderation & AI scoring, categories, allow/flag/block decisions, fallback rules, and stored moderation results support the review workflow. \\
+\hline
+Administration & Dashboards, audit logs, user risk summaries, warnings, freezes, unfreezing, and appeals support platform governance. \\
+\hline
+\caption{Summary of functional results}\\
+\end{longtable}
+
+\section{Architectural Results}
+
+The project achieved a clear separation between frontend, backend, database, and AI service. The backend is structured around feature areas and supporting infrastructure services, while the frontend is organized around Angular routes, pages, guards, shared components, models, and data-access services.
+
+This structure improves maintainability in several ways. First, each functional area can be modified without searching through unrelated files. Second, request and response contracts are represented by DTOs and TypeScript interfaces. Third, backend authorization remains centralized and explicit through policies and role attributes. Finally, moderation and AI logic are isolated in services instead of being duplicated inside controllers.
+
+The use of Entity Framework Core migrations also supports database evolution. As the project gained community, moderation, and administration features, the schema could be adapted progressively while preserving an organized persistence model.
+
+\section{Requirement Traceability}
+
+Traceability connects the requirements defined in the analysis chapter with the implemented result. The following matrix summarizes this connection.
+
+\begin{longtable}{|m{3cm}|m{7cm}|m{4.5cm}|}
+\hline
+\textbf{Requirement} & \textbf{Implemented support} & \textbf{Status} \\
+\hline
+FR-01 to FR-06 & Registration, login, JWT creation, administrator account handling, password validation, failed-login lockout, and profile-name moderation. & Implemented \\
+\hline
+User profile & Profile retrieval, update, avatar handling, member lookup, and search. & Implemented \\
+\hline
+Posts & Post creation, update, deletion, retrieval, author data, visibility, comments, and reactions. & Implemented \\
+\hline
+Friend requests & Request creation, status update, cancellation, and request listing. & Implemented \\
+\hline
+Direct messaging & Conversation retrieval, message creation, read state, read cursor updates, and unread counters. & Implemented \\
+\hline
+Notifications & Notification retrieval, read state update, read-all action, and navbar badges. & Implemented \\
+\hline
+Moderation & AI scoring, allow/flag/block decisions, categories, fallback rules, flagged content review, warnings, freezes, and appeals. & Implemented \\
+\hline
+Administration & Dashboard overview, audit logs, user activity, user risk summaries, warnings, freezes, unfreezing, appeals, and moderation review. & Implemented \\
+\hline
+Real-time delivery & Direct messaging is available through API-based interaction, but WebSocket-based live delivery is not implemented. & Future work \\
+\hline
+External OAuth & Google and GitHub endpoints exist as extension points but are not configured. & Future work \\
+\hline
+\caption{Requirement traceability matrix}\\
+\end{longtable}
+
+\section{AI Moderation Results}
+
+The AI moderation component represents one of the main contributions of the project. It allows the backend to evaluate content through a local Ollama model and convert the result into platform actions. The implementation does not rely only on the model output; it also includes normalization, category filtering, fallback rules, caching, and similarity reuse.
+
+The result is a moderation workflow that is more robust than a direct one-step AI call. If the local model is available and returns valid JSON, the system uses the model assessment. If the model is unavailable or unreliable, the fallback rules still allow the platform to react to clear abuse patterns. This design improves operational continuity and makes moderation behavior more predictable.
+
+The moderation result entity also provides traceability. Each result can store the content type, content snapshot, score, action, reason, flags, escalation state, and creation date. This information is useful for moderators and administrators because it explains why content was allowed, flagged, or blocked.
+
+\section{Limitations}
+
+Although the application is functional, several limitations remain. First, the current messaging implementation is based on API calls and read-state updates, not a real-time WebSocket channel. Second, OAuth endpoints for Google and GitHub are not configured in the current version. Third, the AI moderation quality depends on the local Ollama service and the selected Gemma model. Fourth, the current evaluation is mainly functional and scenario-based; it does not include large-scale load testing or a formal user study.
+
+These limitations are acceptable for the current project scope, but they identify the main directions for future improvement.
+
+\section{Non-Functional Assessment}
+
+The non-functional evaluation is qualitative because the project was not deployed in a large production environment. Nevertheless, several observations can be made.
+
+\begin{itemize}
+    \item \textbf{Maintainability}: the project structure is clearer after organizing backend features, infrastructure services, domain entities, and frontend feature areas.
+    \item \textbf{Security}: JWT authentication, role-based authorization, password hashing, validation, and failed-login lockout provide a reasonable security baseline for the academic scope.
+    \item \textbf{Traceability}: audit logs and persisted moderation results improve the ability to review platform activity.
+    \item \textbf{Usability}: the frontend separates standard user workflows from moderator and administrator workflows, which makes navigation easier to understand.
+    \item \textbf{Extensibility}: the modular organization allows future work on real-time messaging, stronger AI moderation, recommendation, analytics, and mobile access.
+\end{itemize}
+
+The main non-functional gap is the absence of formal performance testing. The architecture is prepared for future optimization, but scalability conclusions would require measured load tests.
+
+\section{Chapter Conclusion}
+
+The evaluation shows that TunSociety meets its main objective: providing a functional, maintainable social networking platform with user interaction, moderation, administration, persistence, and local AI support. The project also demonstrates that AI can be integrated pragmatically as a moderation assistant while preserving human review and administrative control.

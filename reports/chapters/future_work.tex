@@ -1,0 +1,35 @@
+\section{Future Work}
+
+Several improvements can be considered for future versions of TunSociety.
+
+\subsection{Real-Time Communication}
+
+The current messaging system is functional through API-based conversations and read-state updates. A future version could integrate WebSocket communication or SignalR to provide real-time message delivery, typing indicators, online presence, and immediate notification updates.
+
+\subsection{Advanced Moderation Workflow}
+
+The moderation system can be extended with richer review workflows. Future improvements may include multi-level escalation, clearer moderation queues, detailed appeal timelines, moderator comments, stronger report classification, and configurable moderation thresholds. These improvements would make the governance process more transparent and easier to audit.
+
+\subsection{Improved AI Capabilities}
+
+The AI module currently supports text-based moderation through a local model and heuristic fallback rules. Future work may include better prompt calibration, multilingual moderation, model comparison, explainability improvements, and periodic evaluation of false positives and false negatives. The system could also allow administrators to configure moderation categories and thresholds from the dashboard.
+
+\subsection{Recommendation and Personalization}
+
+TunSociety could be improved with recommendation mechanisms that prioritize relevant posts, suggested connections, and useful notifications. Such features should be designed carefully to avoid creating opaque ranking behavior. A transparent and user-controllable recommendation strategy would be preferable.
+
+\subsection{Performance and Scalability}
+
+Future work may include pagination improvements, query optimization, background processing for heavy moderation tasks, caching for frequently accessed data, and load testing. These improvements would become necessary if the platform were deployed for a larger number of users.
+
+\subsection{Mobile Experience}
+
+The platform could also be extended through a dedicated mobile application or a progressive web application experience. This would improve accessibility for users who mainly access social platforms from mobile devices.
+
+\subsection{Testing and Quality Assurance}
+
+Additional automated tests would strengthen the reliability of the project. Unit tests could cover services such as moderation scoring, authorization helpers, and risk calculation. Integration tests could verify API endpoints and database behavior. End-to-end tests could validate complete user workflows such as registration, posting, messaging, and moderation review.
+
+\section{Final Perspective}
+
+TunSociety provides a solid foundation for a controlled social networking platform. The current version demonstrates the feasibility of combining a conventional social application with local AI-assisted moderation. The future improvements described above would help transform the project from a functional academic implementation into a more mature and production-ready platform.
