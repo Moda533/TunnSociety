@@ -1,0 +1,257 @@
+\section{Methodology}
+
+The development of TunSociety followed an iterative methodology inspired by Agile principles and general software engineering practices \cite{sommerville}. This approach was appropriate because the platform contains several independent but connected modules: authentication, profiles, community feed, friend requests, direct messages, notifications, moderation, administration, and artificial intelligence integration. Building the application incrementally made it possible to validate each module before extending the system with more advanced behavior.
+
+The first iterations focused on the technical foundation of the project. The backend structure, database connection, authentication flow, and user model were established before implementing the community features. Later iterations introduced posts, comments, reactions, profile updates, friend requests, direct messages, and notifications. The final functional iterations concentrated on moderation, administration, auditability, and the integration of the local AI service.
+
+The methodology can be summarized through the following recurring activities:
+
+\begin{itemize}
+    \item identify the functional need of a module;
+    \item design the required entities, API endpoints, and frontend screens;
+    \item implement the backend logic and persistence rules;
+    \item connect the Angular frontend to the new APIs;
+    \item verify the behavior manually through realistic user scenarios;
+    \item refine the module according to errors, missing cases, and usability issues.
+\end{itemize}
+
+This approach helped reduce risk because each feature could be tested in isolation before being integrated into the complete platform. It also supported maintainability, since the project structure evolved around clearly identified feature areas instead of a single monolithic code organization.
+
+\section{Actors}
+
+TunSociety defines three main actors. Each actor has a specific responsibility and a different level of access to the application.
+
+\begin{itemize}
+    \item \textbf{Standard User}: interacts with the social platform by managing a profile, publishing content, reacting to posts, commenting, searching members, sending friend requests, using direct messaging, and checking notifications.
+    \item \textbf{Moderator}: supervises content that requires review. The moderator can access the moderation area, inspect flagged content, review warnings, freezes, and appeals, and participate in the platform safety workflow.
+    \item \textbf{Administrator}: has the highest level of control. The administrator can access dashboards, review user activity, consult audit logs, issue warnings or freezes, unfreeze users, review moderation results, and supervise appeals.
+\end{itemize}
+
+The distinction between these actors is implemented through role-based authorization in the backend and route guards in the frontend. This ensures that sensitive screens and administrative APIs are not available to ordinary users.
+
+\section{Requirement Prioritization}
+
+The requirements were prioritized according to their importance for a functional and coherent social platform. Core requirements were implemented first because other modules depend on them. Secondary requirements were implemented after the main workflows became stable. Extension requirements are kept for future work.
+
+\begin{longtable}{|m{3.2cm}|m{5.3cm}|m{6.2cm}|}
+\hline
+\textbf{Priority} & \textbf{Requirement area} & \textbf{Justification} \\
+\hline
+High & Authentication and authorization & No protected social or administrative workflow can be trusted without secure account access and role verification. \\
+\hline
+High & User profile and persistence & Users must exist as persistent database entities before posts, comments, requests, messages, or notifications can be attached to them. \\
+\hline
+High & Posts, comments, and reactions & These features form the main interaction layer of the social platform. \\
+\hline
+High & Moderation and administration & The platform requires governance mechanisms to remain safe and manageable. \\
+\hline
+Medium & Friend requests and search & These features improve the social networking experience by allowing users to discover and connect with other members. \\
+\hline
+Medium & Direct messages and notifications & These features improve engagement and communication, but they depend on the existence of authenticated users and social connections. \\
+\hline
+Medium & AI scoring and fallback rules & AI assistance improves moderation efficiency, but it must remain connected to human review and deterministic safeguards. \\
+\hline
+Future & Real-time delivery and external OAuth & These features are useful but not essential for the current academic scope. \\
+\hline
+\caption{Requirement prioritization}\\
+\end{longtable}
+
+\section{Functional Requirements}
+
+The functional requirements describe the services that the platform must provide. They are grouped by actor and by functional module.
+
+\subsection{Authentication and Account Management}
+
+\begin{longtable}{|m{2.3cm}|m{10.2cm}|m{2.3cm}|}
+\hline
+\textbf{Code} & \textbf{Requirement} & \textbf{Priority} \\
+\hline
+FR-01 & The system shall allow a new user to register using an email address, full name, gender, age, password, and password confirmation. & High \\
+\hline
+FR-02 & The system shall reject registration when mandatory fields are missing, the age is below the accepted threshold, the password is weak, or the confirmation does not match. & High \\
+\hline
+FR-03 & The system shall moderate the full name during registration to prevent inappropriate profile names. & Medium \\
+\hline
+FR-04 & The system shall allow users to authenticate using email and password and receive a JWT token after successful login. & High \\
+\hline
+FR-05 & The system shall protect accounts against repeated failed login attempts by applying a temporary lockout after several failures. & High \\
+\hline
+FR-06 & The system shall create or maintain an administrator account from the configured administrative credentials. & High \\
+\hline
+\caption{Authentication and account management requirements}\\
+\end{longtable}
+
+\subsection{User Functionalities}
+
+A standard user must be able to use the platform as a social networking application. The implemented user scope includes:
+
+\begin{itemize}
+    \item viewing and updating personal profile information;
+    \item uploading or updating a profile avatar;
+    \item searching for other members;
+    \item opening member profiles from the search and network areas;
+    \item sending, receiving, accepting, rejecting, and cancelling friend requests;
+    \item consulting the community feed;
+    \item creating, editing, and deleting personal posts where authorized;
+    \item adding comments to posts;
+    \item reacting to posts through supported reaction types;
+    \item exchanging direct messages with other members;
+    \item viewing conversation lists and message history;
+    \item updating message read cursors and read states;
+    \item receiving notifications and marking them as read;
+    \item viewing navigation badges for unread notifications, messages, and pending requests.
+\end{itemize}
+
+These requirements correspond to the implemented community, messaging, notification, user, and friend-request modules of the application.
+
+\subsection{Moderator Functionalities}
+
+Moderators are responsible for maintaining the quality and safety of the platform. Their requirements include:
+
+\begin{itemize}
+    \item accessing the protected moderation dashboard;
+    \item requesting a moderation score for submitted content;
+    \item consulting content that has been flagged by the moderation mechanism;
+    \item reviewing moderation results with the associated score, action, reason, flags, and content snapshot;
+    \item consulting warnings, freezes, and appeals related to user behavior;
+    \item updating the status of appeals when the workflow requires a moderator decision.
+\end{itemize}
+
+The moderator role is intentionally focused on review and supervision. It does not replace the administrator role, which remains responsible for higher-level governance actions.
+
+\subsection{Administrator Functionalities}
+
+Administrators supervise the complete platform. The implemented administration scope includes:
+
+\begin{itemize}
+    \item accessing the administrator dashboard;
+    \item consulting overview indicators such as total users, active users, posts created today, pending reports, warnings, frozen accounts, and new users;
+    \item consulting activity trends and moderation trends;
+    \item listing users and opening detailed user views;
+    \item consulting audit logs and user-specific activity history;
+    \item reviewing user risk summaries including report count, warning count, freeze count, appeal count, risk factors, and risk score;
+    \item issuing warnings to users;
+    \item freezing and unfreezing user accounts;
+    \item reviewing moderation results;
+    \item supervising appeals.
+\end{itemize}
+
+These features provide administrative traceability and help ensure that sensitive moderation actions are visible and organized.
+
+\subsection{Artificial Intelligence Support}
+
+The AI component supports moderation decisions. Its functional requirements are:
+
+\begin{itemize}
+    \item analyze text content submitted to the moderation service;
+    \item return a decision among allow, flag, and block;
+    \item associate the decision with a confidence score and moderation categories;
+    \item support categories such as abuse, hate, political content, pornography, racism, scam, spam, threat, and violence;
+    \item fall back to deterministic heuristic rules when the local AI request fails or returns an invalid response;
+    \item reuse similar previous moderation assessments when possible in order to improve consistency and reduce unnecessary AI calls;
+    \item store moderation results for later review and audit.
+\end{itemize}
+
+This AI support is connected to the backend through local HTTP calls to Ollama. It is not presented as a final legal or ethical authority; it assists human review and platform governance.
+
+\section{Non-Functional Requirements}
+
+In addition to functional features, TunSociety must satisfy several quality attributes.
+
+\begin{longtable}{|m{3.2cm}|m{11.5cm}|}
+\hline
+\textbf{Requirement} & \textbf{Description} \\
+\hline
+Security & The system must protect private routes through JWT authentication, enforce role-based access for moderator and administrator areas, hash passwords before storage, and apply a temporary lockout after repeated failed login attempts. \\
+\hline
+Maintainability & The source code must be organized by feature and responsibility. The backend separates domain entities, infrastructure services, persistence configurations, controllers, DTOs, and feature modules. The frontend separates core services, shared components, and feature pages. \\
+\hline
+Usability & The interface must allow users to access common actions such as profile management, feed consultation, messaging, notifications, search, and requests through clear navigation. \\
+\hline
+Traceability & Important administrative and community actions should be recorded through audit logs or persisted moderation records in order to support later review. \\
+\hline
+Scalability & The architecture should allow future extension of modules such as messaging, notifications, moderation, and analytics without requiring a complete rewrite. \\
+\hline
+Reliability & The backend should validate input, reject invalid operations, and keep database state consistent across users, posts, comments, messages, notifications, and moderation results. \\
+\hline
+Privacy & AI moderation should run locally through Ollama in the current implementation, reducing the need to send moderation content to an external AI provider. \\
+\hline
+Performance & API responses should remain acceptable for common interactions such as loading posts, conversations, notifications, and dashboards. Pagination or limited result retrieval is used where appropriate. \\
+\hline
+\caption{Non-functional requirements}\\
+\end{longtable}
+
+\section{System Analysis}
+
+\subsection{Main Use Cases}
+
+The principal use cases of TunSociety can be grouped into four categories:
+
+\begin{itemize}
+    \item \textbf{Account use cases}: registration, login, protected navigation, profile consultation, profile update, and avatar update.
+    \item \textbf{Community use cases}: create a post, update a post, delete a post, comment on a post, react to a post, search users, and manage friend requests.
+    \item \textbf{Communication use cases}: send a direct message, consult conversations, mark messages as read, and consult notifications.
+    \item \textbf{Governance use cases}: evaluate content, consult flagged content, review moderation records, issue warnings, freeze or unfreeze users, inspect audit logs, and process appeals.
+\end{itemize}
+
+These use cases show that TunSociety is not limited to a feed page. It contains a complete interaction cycle between users, as well as governance mechanisms that help protect the platform.
+
+\subsection{Detailed Use Case Descriptions}
+
+The following table describes representative use cases in more detail.
+
+\begin{longtable}{|m{3.2cm}|m{3.2cm}|m{7.6cm}|}
+\hline
+\textbf{Use case} & \textbf{Primary actor} & \textbf{Description} \\
+\hline
+Register account & Standard user & The user submits personal information and credentials. The backend validates the input, checks password complexity, moderates the display name, hashes the password, creates the user, and returns an authentication token. \\
+\hline
+Publish post & Standard user & The user creates a post with a title, content, optional image, and visibility. The backend validates and persists the post, then the frontend updates the feed. \\
+\hline
+React to post & Standard user & The user selects a reaction type. The backend records or updates the reaction and returns the updated reaction summary. \\
+\hline
+Send friend request & Standard user & The user sends a request to another member. The system stores the request as pending and exposes it to the recipient through the request page and badges. \\
+\hline
+Send direct message & Standard user & The user writes a private message to another member. The backend stores the message, updates read state information, and exposes the conversation through the messenger page. \\
+\hline
+Review flagged content & Moderator & The moderator opens the moderation dashboard, inspects content that was flagged by the moderation system, and uses the score, flags, and reason to support review. \\
+\hline
+Issue warning & Administrator & The administrator opens a user detail or moderation context and issues a warning with a reason. The action is persisted and contributes to user risk history. \\
+\hline
+Freeze account & Administrator & The administrator freezes a user account when the situation requires stronger action. The freeze contains a reason, start date, optional end date, and active status. \\
+\hline
+Review appeal & Moderator or administrator & The reviewer consults submitted appeals and updates their status according to the moderation decision. \\
+\hline
+Inspect audit logs & Administrator & The administrator opens audit logs to understand previous actions and maintain platform traceability. \\
+\hline
+\caption{Representative use case descriptions}\\
+\end{longtable}
+
+\subsection{AI-Assisted Moderation}
+
+The moderation workflow is one of the most important analytical parts of the system. When content is evaluated, the backend requests an assessment from the AI scoring service. The assessment includes a numerical score and one or more flags. The moderation service then maps the result to one of three actions:
+
+\begin{itemize}
+    \item \textbf{Allow}: the content is considered safe and can continue through the normal workflow;
+    \item \textbf{Flag}: the content is suspicious or borderline and should be reviewed by a moderator;
+    \item \textbf{Block}: the content is considered highly risky and should not be accepted.
+\end{itemize}
+
+The system blocks content when serious categories such as violence, threats, hate, racism, pornography, or scams are detected, or when the score exceeds a high threshold. It flags content when categories such as abuse, spam, or political content require human review, or when the score is above the review threshold.
+
+\subsection{Constraints and Assumptions}
+
+Several constraints guided the implementation:
+
+\begin{itemize}
+    \item the backend and frontend are developed as separate applications;
+    \item the backend is responsible for validation, authorization, persistence, and moderation decisions;
+    \item the frontend is responsible for presentation, navigation, form handling, and user interaction;
+    \item the database is relational and stores structured community, user, and moderation data;
+    \item AI moderation depends on the availability of the local Ollama service and the configured Gemma model;
+    \item OAuth endpoints are present as unconfigured extension points but are not active in the current version, so standard email/password authentication remains the implemented authentication flow.
+\end{itemize}
+
+\section{Chapter Conclusion}
+
+This chapter defined the methodology, actors, functional requirements, non-functional requirements, and main use cases of TunSociety. The analysis shows that the project combines common social media behavior with platform supervision and local AI-assisted moderation. These requirements provide the basis for the design choices presented in the next chapter.

@@ -1,0 +1,498 @@
+\section{Introduction}
+
+The realization phase explains how the TunSociety design was transformed into a working application. It describes the development environment, the implementation of the main backend and frontend modules, the moderation integration, the administration workflows, validation scenarios, deployment preparation, maintenance concerns, and future improvements.
+
+\section{Technical Environment and Constraints}
+
+\subsection{Hardware Environment}
+
+The project was developed on a personal computer capable of running the frontend development server, the ASP.NET Core backend, the MySQL database, and the local AI service at the same time. This point is important because AI-assisted moderation was tested locally through Ollama and the Gemma model.
+
+A practical development environment for this project requires:
+
+\begin{itemize}
+    \item a modern multi-core processor;
+    \item at least 8 GB of RAM for simultaneous frontend, backend, database, and AI execution;
+    \item enough disk space for source code, dependencies, database files, uploaded avatars, and generated reports;
+    \item a stable local network configuration so the Angular client can communicate with the API.
+\end{itemize}
+
+\subsection{Software Environment}
+
+The implementation uses the following software stack:
+
+\begin{itemize}
+    \item \textbf{Angular 21} and \textbf{TypeScript} for the single-page frontend application \cite{angular_docs};
+    \item \textbf{ASP.NET Core} targeting \textbf{.NET 8} for the REST API \cite{aspnetcore_docs,dotnet_docs};
+    \item \textbf{Entity Framework Core 8} and the Pomelo MySQL provider for persistence \cite{efcore_docs,mysql_docs};
+    \item \textbf{MySQL} as the relational database engine;
+    \item \textbf{JWT Bearer Authentication} for protected API access \cite{jwt_rfc};
+    \item \textbf{BCrypt.Net} for password hashing;
+    \item \textbf{Ollama} with the \textbf{Gemma} model for local moderation assistance \cite{ollama_docs};
+    \item Visual Studio Code, npm, the Angular CLI, and .NET CLI tools for development and builds.
+\end{itemize}
+
+Some constraints shaped the first version. Messaging uses API calls and read-state updates instead of WebSocket delivery. OAuth integration is left as an extension point. AI moderation depends on the local Ollama service, so fallback rules are required when the model is unavailable.
+
+\section{Backend Realization}
+
+\subsection{Project Organization}
+
+The backend is organized around controllers, DTOs, services, entities, persistence configuration, and application settings. Controllers expose HTTP endpoints. DTOs define request and response contracts. Services contain business rules such as authentication, moderation, notifications, administration, and audit logging. Entities represent persistent data stored through Entity Framework Core.
+
+\begin{longtable}{|m{3.5cm}|m{5.2cm}|m{5.4cm}|}
+\hline
+\textbf{Backend part} & \textbf{Responsibility} & \textbf{Example in TunSociety} \\
+\hline
+Controllers & Receive HTTP requests and apply route-level authorization. & Auth, users, posts, messages, moderation, and admin endpoints. \\
+\hline
+DTOs & Separate API contracts from database entities. & Login requests, post responses, conversation responses, user detail responses, and appeal responses. \\
+\hline
+Services & Coordinate validation, business rules, persistence, and side effects. & Authentication service, moderation service, notification service, admin service, and audit service. \\
+\hline
+Entities & Represent durable domain data. & User, Post, DirectMessage, ModerationResult, Warning, Freeze, Appeal, and AuditLog. \\
+\hline
+Persistence configuration & Configure relationships, constraints, value conversions, and database mapping. & Entity Framework Core configurations for users, social data, messages, and governance data. \\
+\hline
+Application settings & Store environment-specific values. & Database connection, JWT settings, CORS origin, administrator account, and AI service URL. \\
+\hline
+\caption{Backend organization}
+\end{longtable}
+
+This organization keeps sensitive rules in the backend. A frontend button may be hidden for usability, but the backend still checks authorization before applying a role change, warning, freeze, or appeal review.
+
+\subsection{Authentication and Authorization}
+
+The authentication module implements registration, login, password validation, password hashing, failed-login handling, administrator account support, and token generation. During registration, the backend checks required fields, age, gender, password strength, password confirmation, duplicate email, and reserved administrator email usage. Passwords are stored as BCrypt hashes.
+
+During login, the backend validates credentials and returns a JWT token when the login succeeds. Failed attempts can lead to temporary protection against repeated invalid login trials. Authorization is role-based: standard users access ordinary community workflows, moderators access review workflows, and administrators access governance workflows.
+
+\begin{longtable}{|m{3.3cm}|m{5.2cm}|m{5.5cm}|}
+\hline
+\textbf{Security element} & \textbf{Implementation} & \textbf{Purpose} \\
+\hline
+Password hashing & BCrypt hash before storing credentials. & Avoid clear-text password storage. \\
+\hline
+JWT token & Token generated after a valid login. & Identify authenticated requests. \\
+\hline
+Role claim & User role included in the authenticated identity. & Separate User, Moderator, and Admin behavior. \\
+\hline
+Frontend guards & Angular guards for private, moderator, and administrator routes. & Improve navigation and prevent accidental access. \\
+\hline
+Backend policies & ASP.NET Core authorization checks on sensitive endpoints. & Provide the real security boundary. \\
+\hline
+Failed-login handling & Track invalid attempts and restrict repeated failures. & Reduce brute-force login risk. \\
+\hline
+\caption{Authentication and authorization details}
+\end{longtable}
+
+\subsection{Social and Communication Modules}
+
+The user module manages profile data, avatars, member lookup, and search results. The feed module manages posts, comments, reactions, visibility, optional media, and feed responses. The networking module manages friend request lifecycle states. The messaging module stores direct messages and read cursors. The notification module stores activity items and exposes badge counters.
+
+\begin{longtable}{|m{3.4cm}|m{5.3cm}|m{5.4cm}|}
+\hline
+\textbf{Workflow} & \textbf{Backend behavior} & \textbf{Frontend behavior} \\
+\hline
+Profile & Load and update safe user data and avatar information. & Display profile form, avatar, and member identity. \\
+\hline
+Feed & Validate, moderate, store, update, and return posts with comments and reactions. & Display composer, post cards, comment area, and reaction controls. \\
+\hline
+Search & Query users by keyword and return safe summaries. & Show member cards and profile access actions. \\
+\hline
+Friend requests & Validate requester, recipient, duplicates, and state transitions. & Provide send, accept, reject, and cancel actions. \\
+\hline
+Messaging & Store sender, recipient, content, timestamp, and read cursor data. & Display conversations, message history, and composer. \\
+\hline
+Notifications & Store activity events and update read states. & Display notification list and refresh badges. \\
+\hline
+\caption{Social and communication module realization}
+\end{longtable}
+
+These modules were implemented with consistency checks. For example, the backend prevents duplicate active friend requests between the same members. It also validates message participants before saving a message and refreshes unread state from server responses instead of assuming that the frontend state is correct.
+
+\section{AI-Assisted Moderation}
+
+The moderation feature is built around three cooperating parts: a local AI request to Ollama, a scoring and normalization layer, and a moderation service that maps the result to a platform action. The system asks the model for a structured assessment containing a decision, categories, confidence, and reason. Categories include abuse, hate, pornography, racism, scam, spam, threat, and violence.
+
+If the AI service is not available or if the model response cannot be parsed safely, deterministic fallback rules still return a controlled result. This prevents the whole content workflow from depending on a single external process.
+
+\begin{longtable}{|m{3.3cm}|m{4.8cm}|m{5.7cm}|}
+\hline
+\textbf{Moderation case} & \textbf{Action} & \textbf{Reason} \\
+\hline
+Low-risk content & Allow & The content can be stored and displayed normally. \\
+\hline
+Borderline content & Flag & The content should remain visible to responsible actors for review. \\
+\hline
+High-risk content & Block & The content is rejected when score or category indicates serious risk. \\
+\hline
+AI unavailable & Use fallback rules & Moderation support continues during local service failure. \\
+\hline
+Review needed & Store result & Moderators and administrators can inspect snapshot, score, categories, action, and reason. \\
+\hline
+\caption{Moderation behavior}
+\end{longtable}
+
+The moderation implementation is intentionally not fully automatic. AI output supports the decision process, but the platform stores the result so that human review remains possible. This approach is more appropriate for communities where sanctions and content decisions must be explainable.
+
+\section{Administration Realization}
+
+The administration module gives the platform its governance capability. Administrators can consult overview indicators, list users, open user details, update roles, issue warnings, freeze or unfreeze accounts, supervise appeals, read audit logs, and inspect risk summaries.
+
+\begin{longtable}{|m{3.4cm}|m{4.9cm}|m{5.6cm}|}
+\hline
+\textbf{Admin feature} & \textbf{Backend support} & \textbf{Frontend support} \\
+\hline
+Overview indicators & Aggregate users, activity, warnings, freezes, and pending information. & Dashboard cards and summary areas. \\
+\hline
+User listing & Return searchable user summaries with role, status, and identity. & Filterable list and responsive user cards. \\
+\hline
+User detail & Return profile, status, activity, sanctions, appeals, and risk information. & Desktop side panel and mobile popup detail. \\
+\hline
+Role change & Validate admin rights and persist the new role. & Role select in the user detail view. \\
+\hline
+Warning & Store target user, actor, reason, and timestamp. & Warning action from administration context. \\
+\hline
+Freeze and unfreeze & Store freeze history and update account status. & Confirmation controls and refreshed status display. \\
+\hline
+Appeals & Load appeals and persist review decisions. & Appeals dashboard and detail view. \\
+\hline
+Audit logs & Record actor, action, target, category, and metadata. & Audit lists and user history panels. \\
+\hline
+\caption{Administration implementation summary}
+\end{longtable}
+
+Responsive behavior was part of the implementation. On desktop, an administrator can view the user list and detail panel together. On Android-size screens, tapping Open on a user card displays the same detail information in a popup. This keeps account supervision usable when a side panel would be too narrow.
+
+\section{Frontend Realization}
+
+The Angular application is organized by feature areas. Authentication pages handle login and registration. The user dashboard contains profile, feed, search, requests, messenger, notifications, and member pages. Moderation and administration are separated from ordinary member pages. Shared components provide repeated interface elements, while core services handle cross-application concerns such as authentication state and API access.
+
+\begin{longtable}{|m{3.5cm}|m{5.4cm}|m{5.2cm}|}
+\hline
+\textbf{Frontend area} & \textbf{Content} & \textbf{Objective} \\
+\hline
+Authentication & Login and registration pages with validation feedback. & Give visitors a clear entry point. \\
+\hline
+Dashboard & Private layout, navigation, badge display, and guarded routes. & Provide a coherent member workspace. \\
+\hline
+Profile and members & Profile form, avatar, public member details, and profile actions. & Keep identity visible and consistent. \\
+\hline
+Feed & Composer, post list, comments, reactions, and refresh behavior. & Support daily community interaction. \\
+\hline
+Search and requests & Member search, request cards, incoming and outgoing actions. & Support controlled relationship creation. \\
+\hline
+Messenger & Conversation list, message history, read state, and composer. & Support private coordination. \\
+\hline
+Notifications & Notification list, read actions, and badge synchronization. & Keep users aware of activity. \\
+\hline
+Moderation & Flagged content, scores, categories, reasons, and snapshots. & Support review of risky content. \\
+\hline
+Administration & Overview, users, appeals, audit logs, details, sanctions, and responsive popup. & Support governance and account supervision. \\
+\hline
+Shared components & Buttons, cards, avatars, status pills, selects, and empty states. & Reduce visual and logic duplication. \\
+\hline
+\caption{Frontend realization by area}
+\end{longtable}
+
+State management was kept pragmatic. Authentication and badge data are shared because many pages depend on them. Page-specific state, such as the selected admin user or open popup, remains local. After server-side changes, the frontend refreshes data from the API so the displayed state matches the database.
+
+\section{Configuration and Environment Handling}
+
+The project uses configuration for values that change between environments. This includes database connection settings, JWT signing information, CORS origin, administrator account values, and the local AI service URL.
+
+\begin{longtable}{|m{3.6cm}|m{5.4cm}|m{5.2cm}|}
+\hline
+\textbf{Configuration area} & \textbf{Use} & \textbf{Reason} \\
+\hline
+Database connection & Connect the backend to MySQL. & Allows development and future deployment values to differ. \\
+\hline
+JWT settings & Configure signing, issuer, audience, and expiration. & Protect authentication behavior. \\
+\hline
+CORS origin & Allow the Angular frontend to call the backend. & Keeps browser security rules explicit. \\
+\hline
+Administrator account & Define initial administrator identity. & Ensures supervision access exists. \\
+\hline
+AI service URL & Point moderation logic to Ollama. & Allows the local AI service address to change. \\
+\hline
+Frontend API URL & Point Angular services to the backend API. & Supports development and later deployment environments. \\
+\hline
+\caption{Configuration handling}
+\end{longtable}
+
+\section{Error Handling and User Feedback}
+
+Error handling was treated as part of implementation quality. Invalid operations should be rejected without leaving the interface in an unclear state. The backend returns controlled responses, and the frontend keeps the current context visible when possible.
+
+\begin{longtable}{|m{3.4cm}|m{4.8cm}|m{5.8cm}|}
+\hline
+\textbf{Case} & \textbf{Backend response} & \textbf{Frontend behavior} \\
+\hline
+Invalid registration & Reject account creation and return validation feedback. & Keep the user on the form and display the problem. \\
+\hline
+Duplicate email & Reject the request because the account already exists. & Show an account-related error. \\
+\hline
+Invalid login & Reject credentials and update failed-attempt logic. & Display a generic login error. \\
+\hline
+Unauthorized request & Return unauthorized or forbidden status. & Block the action or redirect according to session state. \\
+\hline
+Invalid content & Reject or moderate the content according to risk. & Display validation or moderation feedback near the action. \\
+\hline
+Invalid relationship action & Reject duplicate or inconsistent request transitions. & Keep the existing relationship state visible. \\
+\hline
+AI timeout & Apply fallback rules or return a controlled moderation response. & Avoid an endless loading state. \\
+\hline
+Admin action failure & Preserve previous data and return an error response. & Keep the detail view open and show failure feedback. \\
+\hline
+\caption{Error handling and feedback}
+\end{longtable}
+
+\section{Testing and Validation}
+
+\subsection{Manual Verification}
+
+The validation work focused on complete workflows because TunSociety combines frontend screens, API endpoints, persistence, authorization, and moderation. A feature was considered ready only when it could be used through the interface and confirmed through the expected backend behavior.
+
+Representative checks included:
+
+\begin{itemize}
+    \item registering a valid user and rejecting invalid registration data;
+    \item logging in and opening protected dashboard pages;
+    \item creating, editing, deleting, commenting on, and reacting to posts;
+    \item searching members and moving friend requests through their lifecycle;
+    \item sending direct messages and updating read state;
+    \item displaying notifications and refreshing navigation badges;
+    \item scoring safe and risky content through AI moderation or fallback rules;
+    \item opening moderator and administrator pages with the correct roles;
+    \item issuing warnings, freezing accounts, unfreezing accounts, and reviewing appeals;
+    \item opening the admin user detail popup on Android-size screens.
+\end{itemize}
+
+\subsection{Validation Matrix}
+
+\begin{longtable}{|m{3.2cm}|m{5.9cm}|m{5.3cm}|}
+\hline
+\textbf{Module} & \textbf{Validation action} & \textbf{Expected result} \\
+\hline
+Registration & Submit complete and valid data. & User is created, password is hashed, and token is returned. \\
+\hline
+Registration & Submit weak password or invalid confirmation. & Request is rejected with validation feedback. \\
+\hline
+Login & Submit correct credentials. & JWT token and user identity are returned. \\
+\hline
+Login & Submit repeated wrong credentials. & Failed attempts are counted and protection can apply. \\
+\hline
+Profile & Update profile information and avatar. & Data is persisted and interface refreshes. \\
+\hline
+Feed & Create a valid post. & Post is moderated, stored, and displayed. \\
+\hline
+Feed & Delete own post. & Post disappears from the feed and database state remains coherent. \\
+\hline
+Comments & Add a comment. & Comment is stored with author information. \\
+\hline
+Reactions & Add or change a reaction. & Reaction summary is updated. \\
+\hline
+Search & Search by name or email. & Matching members are returned. \\
+\hline
+Requests & Send, accept, reject, or cancel a request. & Request state follows the expected lifecycle. \\
+\hline
+Messaging & Send a direct message and open conversation. & Message appears and read state updates. \\
+\hline
+Notifications & Mark notifications as read. & Read state and badges update. \\
+\hline
+Moderation & Submit safe and risky text. & The system returns Allow, Flag, or Block according to the assessment. \\
+\hline
+AI fallback & Stop or bypass the local AI service during scoring. & Fallback rules still return a moderation result. \\
+\hline
+Admin users & Open a user detail on desktop. & Detail panel appears beside the list. \\
+\hline
+Admin users & Tap Open on a mobile card. & Detail card appears as a popup. \\
+\hline
+Admin sanctions & Freeze and unfreeze an account with a reason. & Account status changes and traceability is stored. \\
+\hline
+Appeals & Review an appeal. & Appeal status is updated and remains available for review. \\
+\hline
+\caption{Validation matrix}
+\end{longtable}
+
+\subsection{Test Case Catalogue}
+
+\begin{longtable}{|m{2cm}|m{5.1cm}|m{6.5cm}|}
+\hline
+\textbf{Code} & \textbf{Scenario} & \textbf{Expected result} \\
+\hline
+TC-01 & Register with empty required fields. & Registration is rejected. \\
+\hline
+TC-02 & Register with age below the accepted threshold. & Account creation is blocked. \\
+\hline
+TC-03 & Register with an existing email. & Duplicate account creation is rejected. \\
+\hline
+TC-04 & Log in with valid credentials. & Token and profile information are returned. \\
+\hline
+TC-05 & Open private route without token. & Access is denied or redirected. \\
+\hline
+TC-06 & Open admin route as standard user. & Access is denied. \\
+\hline
+TC-07 & Update profile information. & Profile changes are persisted. \\
+\hline
+TC-08 & Search for an existing member. & The member appears in results. \\
+\hline
+TC-09 & Search for an unknown member. & Empty state is displayed. \\
+\hline
+TC-10 & Create valid post. & Post appears in the feed. \\
+\hline
+TC-11 & Create risky post. & Moderation action is applied. \\
+\hline
+TC-12 & Edit or delete owned post. & Authorized change is applied. \\
+\hline
+TC-13 & Comment and react to a post. & Interaction data is displayed. \\
+\hline
+TC-14 & Send friend request. & Pending request is created. \\
+\hline
+TC-15 & Accept or reject request. & Request state is updated. \\
+\hline
+TC-16 & Send direct message. & Message appears in the conversation. \\
+\hline
+TC-17 & Mark notification as read. & Badge count decreases. \\
+\hline
+TC-18 & Score safe content. & Decision is Allow. \\
+\hline
+TC-19 & Score abusive content. & Decision is Flag or Block. \\
+\hline
+TC-20 & Score content when AI is unavailable. & Fallback rules provide a result. \\
+\hline
+TC-21 & Open admin users page. & Users and filters are displayed. \\
+\hline
+TC-22 & Tap Open on Android-size user card. & Mobile detail popup opens. \\
+\hline
+TC-23 & Change user role as admin. & Role is updated and traceability is stored. \\
+\hline
+TC-24 & Issue warning. & Warning appears in user history. \\
+\hline
+TC-25 & Freeze and unfreeze user. & Status changes and audit entries are stored. \\
+\hline
+TC-26 & Review appeal. & Appeal status is saved. \\
+\hline
+\caption{Scenario-based test catalogue}
+\end{longtable}
+
+\section{Deployment Preparation and Maintenance}
+
+The current version was validated in a development environment. A production deployment would require preparation of secure credentials, HTTPS, a database backup strategy, monitoring, and deployment automation. The report does not claim that production hosting was completed; instead, it identifies the work needed to move from local validation to a hosted environment.
+
+\begin{longtable}{|m{3.7cm}|m{5.1cm}|m{5.2cm}|}
+\hline
+\textbf{Deployment item} & \textbf{Preparation needed} & \textbf{Reason} \\
+\hline
+Frontend hosting & Build Angular and configure the API base URL. & Allow users to access the application through a browser. \\
+\hline
+Backend hosting & Publish the ASP.NET Core API with environment settings. & Expose secure server-side operations. \\
+\hline
+Database & Configure MySQL credentials, schema, and backup routine. & Preserve persistent user and governance data. \\
+\hline
+Authentication & Use strong JWT signing keys and HTTPS. & Protect sessions and private requests. \\
+\hline
+AI moderation & Install and monitor Ollama and the selected model. & Keep moderation support available. \\
+\hline
+Logs and monitoring & Collect backend errors and service availability information. & Detect failures after deployment. \\
+\hline
+Automated tests & Add unit, integration, and end-to-end checks. & Reduce regression risk during future changes. \\
+\hline
+\caption{Deployment preparation}
+\end{longtable}
+
+Maintenance must keep the API, frontend models, database schema, and report documentation aligned. This is especially important for moderation and administration, because changes in these areas affect trust, account status, and traceability.
+
+\begin{longtable}{|m{3.8cm}|m{9.8cm}|}
+\hline
+\textbf{Maintenance area} & \textbf{Recommended action} \\
+\hline
+Database schema & Keep migrations synchronized with entity changes and verify relationships after updates. \\
+\hline
+API contracts & Update DTOs, Angular models, and documentation whenever responses change. \\
+\hline
+Authentication & Rotate production secrets and avoid committing sensitive values. \\
+\hline
+AI moderation & Monitor local model availability and review false positives or false negatives. \\
+\hline
+Admin workflows & Re-test warnings, freezes, appeals, and audit logs after governance changes. \\
+\hline
+Responsive interface & Re-check dashboard, feed, profile, messaging, and admin pages on desktop and mobile. \\
+\hline
+Dependencies & Review Angular, .NET, Entity Framework Core, MySQL provider, and package updates before applying them. \\
+\hline
+\caption{Maintenance recommendations}
+\end{longtable}
+
+\section{Future Work}
+
+Several improvements can strengthen TunSociety after the academic version:
+
+\begin{itemize}
+    \item real-time messaging with SignalR or WebSockets;
+    \item a progressive web application experience for mobile users;
+    \item richer moderation timelines with moderator comments and escalation history;
+    \item configurable moderation thresholds;
+    \item multilingual moderation for Arabic, French, English, and Tunisian dialect;
+    \item analytics for activity, growth, and moderation trends;
+    \item OAuth authentication if required by the host organization;
+    \item automated unit, integration, and end-to-end testing;
+    \item deployment scripts or containerization.
+\end{itemize}
+
+\begin{longtable}{|m{3.5cm}|m{5.2cm}|m{5.4cm}|}
+\hline
+\textbf{Improvement} & \textbf{Motivation} & \textbf{Expected benefit} \\
+\hline
+SignalR messaging & Current messages refresh through API calls. & Instant delivery, typing state, and online presence. \\
+\hline
+Progressive web app & Many community members may use Android phones. & Better installability and mobile usability. \\
+\hline
+Moderation timeline & Current records are functional but can be richer. & More transparent review and appeal history. \\
+\hline
+Configurable thresholds & Risk sensitivity may differ by organization. & Administrators can adapt moderation strictness. \\
+\hline
+Multilingual moderation & Tunisian communities often mix languages. & More accurate content assessment. \\
+\hline
+Analytics dashboard & Administrators may need trends over time. & Better supervision of activity and risk. \\
+\hline
+Automated tests & Manual checks are useful but limited. & Stronger reliability during future changes. \\
+\hline
+Deployment automation & Manual publication can introduce errors. & More stable releases and easier maintenance. \\
+\hline
+\caption{Future work analysis}
+\end{longtable}
+
+\section{Implementation Traceability}
+
+Implementation traceability connects the realized modules with the requirements.
+
+\begin{longtable}{|m{3.5cm}|m{5.2cm}|m{5.3cm}|}
+\hline
+\textbf{Requirement area} & \textbf{Implemented evidence} & \textbf{Observed result} \\
+\hline
+Authentication & Auth endpoints, token creation, BCrypt hashing, and route guards. & Users can authenticate and private routes are protected. \\
+\hline
+Profiles & User endpoints, profile page, avatar data, and member page. & Identity and member data are available in the interface. \\
+\hline
+Feed & Post APIs, comments, reactions, and Angular feed components. & Community publication and interaction are functional. \\
+\hline
+Friend requests & Request entity, endpoints, request page, and state transitions. & Members can manage connection workflows. \\
+\hline
+Messaging & Direct message APIs, conversation models, and messenger page. & Private communication is supported. \\
+\hline
+Notifications & Notification APIs, badge endpoint, and notification page. & Users can follow activity indicators. \\
+\hline
+Moderation & Local AI request, scoring service, fallback rules, and review views. & Risky content can be evaluated and reviewed. \\
+\hline
+Administration & Admin APIs, dashboard, user detail, sanctions, appeals, and audit logs. & Governance workflows are implemented. \\
+\hline
+Responsive UI & Mobile admin user detail popup and adapted layouts. & Administration remains usable on Android-size screens. \\
+\hline
+\caption{Implementation traceability}
+\end{longtable}
+
+\section{Conclusion}
+
+The realization phase produced a functional full-stack version of TunSociety. The backend provides secure and traceable operations, the frontend exposes member and governance workflows, the database preserves community and administration data, and local AI support assists moderation. The current implementation satisfies the main objectives while leaving clear technical directions for future versions.

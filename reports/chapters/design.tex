@@ -1,0 +1,625 @@
+\section{Introduction}
+
+The conception phase transforms the needs defined in the previous chapter into a technical structure. For TunSociety, the design challenge was to connect two kinds of behavior in one coherent system: ordinary community interaction and controlled governance. The sections below describe the modules, layers, use cases, data model, API contract, access rules, and interaction sequences used to guide the implementation.
+
+\section{Overview of System Modules}
+
+TunSociety uses a client-server architecture. The Angular frontend is responsible for presentation and interaction. The ASP.NET Core backend exposes REST endpoints, validates requests, applies authorization, coordinates business rules, and communicates with persistence and AI support services. MySQL stores the data through Entity Framework Core. Ollama and Gemma are used locally to support moderation decisions.
+
+\begin{figure}[H]
+\centering
+\fbox{
+\begin{minipage}{0.86\textwidth}
+\centering
+Angular frontend \\
+$\downarrow$ HTTP requests, JSON payloads, JWT token \\
+ASP.NET Core REST API \\
+$\downarrow$ Entity Framework Core \hspace{1cm} $\downarrow$ local moderation request \\
+MySQL database \hspace{2cm} Ollama / Gemma service
+\end{minipage}
+}
+\caption{Global architecture of TunSociety}
+\end{figure}
+
+The application is divided into modules so that each functional area has a clear responsibility.
+
+\begin{longtable}{|m{3.5cm}|m{10.4cm}|}
+\hline
+\textbf{Module} & \textbf{Design responsibility} \\
+\hline
+Authentication & Handles registration, login, password checks, account lockout, administrator initialization, JWT creation, and session identity. \\
+\hline
+Users and profiles & Handles current profile data, avatar information, member profile pages, search results, and safe identity summaries. \\
+\hline
+Community feed & Handles posts, comments, reactions, media references, visibility, author information, and feed refresh. \\
+\hline
+Networking & Handles friend request creation, pending state, acceptance, rejection, cancellation, and relationship constraints. \\
+\hline
+Messaging & Handles direct messages, conversation summaries, message history, read cursors, and unread counters. \\
+\hline
+Notifications & Handles activity notifications, read state, read-all operations, and compact badge data for navigation. \\
+\hline
+Moderation & Handles text scoring, category detection, fallback rules, stored results, and content review information. \\
+\hline
+Administration & Handles dashboard indicators, user supervision, roles, warnings, freezes, appeals, risk summaries, and audit logs. \\
+\hline
+\caption{Main modules of TunSociety}
+\end{longtable}
+
+The modular structure follows separation of concerns principles \cite{clean_architecture}. The frontend can adapt its interface to different actors, but authoritative decisions remain in the backend. For example, hiding an administrator button in Angular improves the experience, while the backend authorization policy actually protects the operation.
+
+\subsection*{Layered View}
+
+The architecture can also be described by layers. Each layer answers a different question: what the user sees, how requests are sent, which contract the API exposes, which domain concepts are manipulated, where data is stored, and how moderation support is requested.
+
+\begin{longtable}{|m{3.1cm}|m{5.2cm}|m{5.7cm}|}
+\hline
+\textbf{Layer} & \textbf{Responsibility} & \textbf{Examples in TunSociety} \\
+\hline
+Presentation & Display pages and collect user actions. & Angular components, forms, lists, popups, route layouts, and responsive views. \\
+\hline
+Client data access & Send typed requests and map backend responses. & Angular services, TypeScript interfaces, HTTP calls, and badge state. \\
+\hline
+API contract & Expose operations consumed by the frontend. & Controllers, request DTOs, response DTOs, validation messages, and authorization attributes. \\
+\hline
+Domain & Represent the main business objects and rules. & User, Post, DirectMessage, ModerationResult, Warning, Freeze, Appeal, and AuditLog. \\
+\hline
+Persistence & Store and retrieve durable information. & Entity Framework Core, MySQL tables, keys, relationships, and migrations. \\
+\hline
+AI support & Assist content evaluation without replacing system rules. & Ollama client, Gemma prompt, category mapping, cache, and fallback rules. \\
+\hline
+\caption{Layered conception of the system}
+\end{longtable}
+
+\section{Detailed Use Cases}
+
+\subsection{Authentication and Account Management}
+
+The authentication use cases define how a visitor becomes a member and how private routes are protected. Registration validates identity data and password rules, hashes the password, creates the account, and returns an authenticated response. Login verifies credentials, updates failed-attempt information when needed, and returns a token on success.
+
+\begin{longtable}{|m{3.2cm}|m{2.8cm}|m{7.7cm}|}
+\hline
+\textbf{Use case} & \textbf{Actor} & \textbf{Expected result} \\
+\hline
+Register account & Visitor & A valid visitor becomes a user with hashed password data and an initial authenticated session. \\
+\hline
+Log in & User & The user receives identity data, role information, and a JWT token if credentials are valid. \\
+\hline
+Open private area & User & Frontend guards and backend validation confirm that the request belongs to an authenticated user. \\
+\hline
+Open role-restricted area & Moderator or Admin & The backend confirms the role before allowing moderation or administration actions. \\
+\hline
+\caption{Authentication use cases}
+\end{longtable}
+
+\subsection{Profile and Member Management}
+
+The profile module keeps the member identity visible across the application. A user can consult and update personal information and avatar data. Other members can be opened through search results, posts, and relationship workflows, but only safe information is returned.
+
+\subsection{Community Feed}
+
+The feed is the main public interaction area inside the community. A post is not only a piece of text. It is linked to an author, optional media, comments, reactions, timestamps, visibility, and moderation information. This design allows the platform to connect participation with accountability.
+
+\subsection{Networking}
+
+Friend requests model controlled relationships between members. A request has a lifecycle: pending, accepted, rejected, or cancelled. The backend must prevent invalid duplicates and transitions, because relationship state affects search actions, profile cards, and notification badges.
+
+\subsection{Messaging}
+
+Direct messaging supports private coordination. The design separates messages from read cursors. This avoids rewriting every message when a user opens a conversation and makes unread counts easier to calculate.
+
+\subsection{Notifications}
+
+Notifications give users a compact view of platform activity. The notification list stores detailed items, while the navigation badge endpoint returns only the counters needed by the layout. This separation avoids loading unnecessary data for every page change.
+
+\subsection{Moderation}
+
+Moderation evaluates submitted text and maps the result to three possible actions.
+
+\begin{itemize}
+    \item \textbf{Allow}: the content can continue through the normal workflow;
+    \item \textbf{Flag}: the content is stored but should be visible to responsible actors for review;
+    \item \textbf{Block}: the content is rejected because the detected risk is too high.
+\end{itemize}
+
+Each moderation result stores a content snapshot, risk categories, score, action, reason, user reference, and creation time. These fields make review and appeals possible.
+
+\subsection{Administration}
+
+Administration is the governance center of TunSociety. Administrators can inspect users, modify roles, issue warnings, freeze or unfreeze accounts, review appeals, consult risk summaries, and read audit logs. The design requires these actions to be stored because they affect trust and account status.
+
+\begin{longtable}{|m{3.5cm}|m{2.8cm}|m{7.4cm}|}
+\hline
+\textbf{Use case} & \textbf{Actor} & \textbf{Expected result} \\
+\hline
+Manage profile & User & The member updates personal information and sees the updated identity in the interface. \\
+\hline
+Publish content & User & The content is validated, moderated, persisted when allowed by policy, and returned to the feed. \\
+\hline
+Interact with a post & User & Comments and reactions are stored with the actor identity and displayed with the post. \\
+\hline
+Manage relationships & User & Friend request actions move through valid lifecycle states. \\
+\hline
+Exchange messages & User & Messages are stored, conversations are updated, and unread state changes. \\
+\hline
+Review moderation data & Moderator & The moderator can inspect risky content with score, category, and reason. \\
+\hline
+Supervise users & Administrator & User status, history, risk data, sanctions, and roles are available for decision making. \\
+\hline
+Inspect traceability & Administrator & Audit records show important operations and their context. \\
+\hline
+\caption{Representative use cases}
+\end{longtable}
+
+\section{Data Model Overview}
+
+The data model links social activity to governance data. The user entity is central because it participates in content, relationships, messages, notifications, moderation history, sanctions, appeals, and audit records.
+
+\begin{longtable}{|m{3.4cm}|m{5.4cm}|m{5.2cm}|}
+\hline
+\textbf{Entity} & \textbf{Important data} & \textbf{Reason in the model} \\
+\hline
+User & Identity, email, avatar, password hash, role, status, timestamps. & Represents the member and links all personal activity. \\
+\hline
+Post & Author, title, content, image, visibility, created and updated dates. & Represents a publication in the community feed. \\
+\hline
+PostComment & Post, author, content, created date. & Represents discussion below a post. \\
+\hline
+PostReaction & Post, user, reaction type. & Supports reaction summaries and current user reaction. \\
+\hline
+FriendRequest & Requester, recipient, status, note, timestamps. & Represents relationship creation and its lifecycle. \\
+\hline
+DirectMessage & Sender, recipient, content, sent date, read information. & Represents private communication between two members. \\
+\hline
+DirectMessageReadCursor & Participants and last read position. & Supports unread counts without changing all message rows. \\
+\hline
+CommunityNotification & Target user, title, detail, type, read state, timestamps. & Informs users about relevant activity. \\
+\hline
+ModerationResult & Content type, snapshot, score, action, reason, categories, user, date. & Keeps AI-assisted moderation explainable and reviewable. \\
+\hline
+Warning & Target user, administrator, reason, created date. & Records a soft sanction. \\
+\hline
+Freeze & Target user, administrator, reason, active state, dates. & Records account restriction and reversal. \\
+\hline
+Appeal & User, target decision, reason, status, review data. & Supports reconsideration of moderation or sanction decisions. \\
+\hline
+AuditLog & Actor, subject, action, category, target, metadata, date. & Preserves traceability for important operations. \\
+\hline
+\caption{Main domain entities}
+\end{longtable}
+
+\subsection*{Relationship Design}
+
+The relationships must preserve both community behavior and supervision history.
+
+\begin{longtable}{|m{3.5cm}|m{5cm}|m{5.4cm}|}
+\hline
+\textbf{Relationship} & \textbf{Meaning} & \textbf{Design reason} \\
+\hline
+User--Post & A member can publish many posts. & The feed must show author identity and ownership. \\
+\hline
+Post--PostComment & A post can have many comments. & Discussions belong to specific content. \\
+\hline
+User--PostReaction & A member can react to many posts, usually once per post. & Reaction summaries must remain consistent. \\
+\hline
+User--FriendRequest & A member can be requester or recipient. & Relationship state depends on both participants. \\
+\hline
+User--DirectMessage & A member can send and receive messages. & Conversations are built from two-sided communication. \\
+\hline
+User--ModerationResult & Risk records can be linked to the account that submitted content. & Administrators need user risk history. \\
+\hline
+User--Warning & A member can receive several warnings. & Repeated minor issues must remain visible. \\
+\hline
+User--Freeze & A member can have freeze records over time. & Account status decisions must be explainable. \\
+\hline
+User--Appeal & A member can submit or be linked to appeals. & Review workflows require user identity. \\
+\hline
+User--AuditLog & A user can be actor or target. & Traceability needs to record who acted and who was affected. \\
+\hline
+\caption{Important database relationships}
+\end{longtable}
+
+\section{API Contract Overview}
+
+The API contract is organized by functional area. This helps Angular services consume predictable endpoints and keeps controllers focused on one responsibility.
+
+\begin{longtable}{|m{3.3cm}|m{3.9cm}|m{6.1cm}|}
+\hline
+\textbf{Area} & \textbf{Route prefix} & \textbf{Contract role} \\
+\hline
+Authentication & \texttt{/api/auth} & Registration, login, token creation, and administrator account handling. \\
+\hline
+Users & \texttt{/api/users} & Current profile, member lookup, search, profile update, and avatar data. \\
+\hline
+Posts & \texttt{/api/posts} & Feed loading, post creation, update, deletion, comments, and reactions. \\
+\hline
+Friend requests & \texttt{/api/friendrequests} & Request creation, lifecycle transitions, and request lists. \\
+\hline
+Direct messages & \texttt{/api/directmessages} & Conversations, message history, message sending, and read-state update. \\
+\hline
+Notifications & \texttt{/api/notifications} & Notification list and read-state actions. \\
+\hline
+Navbar & \texttt{/api/navbar} & Compact counters for unread messages, notifications, and pending requests. \\
+\hline
+Moderation & \texttt{/api/moderation} & Content scoring, flagged items, warning data, freeze data, and appeal review support. \\
+\hline
+Administration & \texttt{/api/admin} & Dashboard indicators, users, audit logs, risk summaries, sanctions, roles, and appeals. \\
+\hline
+\caption{Backend route organization}
+\end{longtable}
+
+\subsection*{Endpoint Catalogue}
+
+\begin{longtable}{|m{3.2cm}|m{4.5cm}|m{5.8cm}|}
+\hline
+\textbf{Area} & \textbf{Endpoint example} & \textbf{Purpose} \\
+\hline
+Authentication & \texttt{POST /api/auth/register} & Create an account after validation and password hashing. \\
+\hline
+Authentication & \texttt{POST /api/auth/login} & Authenticate a user and return token information. \\
+\hline
+Users & \texttt{GET /api/users/me} & Load the authenticated user's profile. \\
+\hline
+Users & \texttt{GET /api/users/\{id\}} & Load another member profile. \\
+\hline
+Users & \texttt{GET /api/users/search} & Search members by keyword. \\
+\hline
+Users & \texttt{PUT /api/users/\{id\}} & Update allowed profile or role data. \\
+\hline
+Posts & \texttt{GET /api/posts} & Load the community feed. \\
+\hline
+Posts & \texttt{POST /api/posts} & Create a post after validation and moderation. \\
+\hline
+Posts & \texttt{PUT /api/posts/\{id\}} & Update an authorized post. \\
+\hline
+Posts & \texttt{DELETE /api/posts/\{id\}} & Delete an authorized post. \\
+\hline
+Comments & \texttt{POST /api/posts/\{id\}/comments} & Add a comment to a post. \\
+\hline
+Reactions & \texttt{POST /api/posts/\{id\}/reactions} & Add or update a reaction. \\
+\hline
+Friend requests & \texttt{POST /api/friendrequests} & Send a request to a member. \\
+\hline
+Friend requests & \texttt{POST /api/friendrequests/\{id\}/accept} & Accept a pending request. \\
+\hline
+Friend requests & \texttt{POST /api/friendrequests/\{id\}/reject} & Reject a pending request. \\
+\hline
+Friend requests & \texttt{POST /api/friendrequests/\{id\}/cancel} & Cancel an outgoing pending request. \\
+\hline
+Messages & \texttt{GET /api/directmessages/conversations} & Load conversation summaries. \\
+\hline
+Messages & \texttt{GET /api/directmessages/\{userId\}} & Load message history with one member. \\
+\hline
+Messages & \texttt{POST /api/directmessages} & Send a private message. \\
+\hline
+Messages & \texttt{POST /api/directmessages/read} & Update the read cursor. \\
+\hline
+Notifications & \texttt{GET /api/notifications} & Load user notifications. \\
+\hline
+Notifications & \texttt{POST /api/notifications/\{id\}/read} & Mark one notification as read. \\
+\hline
+Notifications & \texttt{POST /api/notifications/read-all} & Mark all notifications as read. \\
+\hline
+Navbar & \texttt{GET /api/navbar/badges} & Load unread counters. \\
+\hline
+Moderation & \texttt{POST /api/moderation/score} & Score text content. \\
+\hline
+Moderation & \texttt{GET /api/moderation/flagged} & Load content requiring review. \\
+\hline
+Administration & \texttt{GET /api/admin/overview} & Load platform indicators. \\
+\hline
+Administration & \texttt{GET /api/admin/users} & List users for supervision. \\
+\hline
+Administration & \texttt{GET /api/admin/users/\{id\}} & Load detailed user information. \\
+\hline
+Administration & \texttt{POST /api/admin/users/\{id\}/warning} & Issue a warning. \\
+\hline
+Administration & \texttt{POST /api/admin/users/\{id\}/freeze} & Freeze an account. \\
+\hline
+Administration & \texttt{POST /api/admin/users/\{id\}/unfreeze} & Unfreeze an account. \\
+\hline
+Administration & \texttt{GET /api/admin/audit-logs} & Load traceability records. \\
+\hline
+Appeals & \texttt{GET /api/admin/appeals} & Load appeals for review. \\
+\hline
+Appeals & \texttt{POST /api/admin/appeals/\{id\}/review} & Save an appeal decision. \\
+\hline
+\caption{Backend endpoint catalogue}
+\end{longtable}
+
+\subsection*{Access Control Matrix}
+
+Access control documents which actor can use each major area. It also helps verify that the design matches the security objective.
+
+\begin{longtable}{|m{5cm}|m{2.6cm}|m{2.6cm}|m{2.6cm}|}
+\hline
+\textbf{Feature} & \textbf{User} & \textbf{Moderator} & \textbf{Admin} \\
+\hline
+Profile management & Yes & Yes & Yes \\
+\hline
+Posts, comments, and reactions & Yes & Yes & Yes \\
+\hline
+Member search and friend requests & Yes & Yes & Yes \\
+\hline
+Direct messaging & Yes & Yes & Yes \\
+\hline
+Notifications & Yes & Yes & Yes \\
+\hline
+Moderation dashboard & No & Yes & Yes \\
+\hline
+Flagged content review & No & Yes & Yes \\
+\hline
+Administration dashboard & No & No & Yes \\
+\hline
+User role changes & No & No & Yes \\
+\hline
+Warnings and freezes & No & No & Yes \\
+\hline
+Audit logs and risk summaries & No & No & Yes \\
+\hline
+Appeal supervision & No & Yes & Yes \\
+\hline
+\caption{Role-based access matrix}
+\end{longtable}
+
+\section{Sequence Logic}
+
+The main sequences describe how data and decisions move through the frontend, backend, database, and AI service.
+
+\subsection{Registration Sequence}
+
+\begin{enumerate}
+    \item The visitor completes the Angular registration form.
+    \item The frontend sends the registration request to the authentication API.
+    \item The backend validates required fields, age, email format, password strength, and password confirmation.
+    \item The backend checks whether the email is already used.
+    \item The submitted display name is moderated before account creation.
+    \item The password is hashed and the user is stored in MySQL.
+    \item The API returns token and user information.
+    \item The frontend stores the session and redirects the new user to the private dashboard.
+\end{enumerate}
+
+\subsection{Post Creation Sequence}
+
+\begin{enumerate}
+    \item The authenticated user writes a post in the feed.
+    \item Angular sends the content, title, visibility, and optional media information to the posts API.
+    \item The backend validates authentication, user status, and submitted fields.
+    \item The moderation service evaluates the text through local AI support or fallback rules.
+    \item A moderation result is stored with score, category, action, and reason.
+    \item If the action allows persistence, the post is saved and returned to the frontend.
+    \item The feed refreshes with the new post or displays a controlled rejection message.
+\end{enumerate}
+
+\subsection{Messaging Sequence}
+
+\begin{enumerate}
+    \item The sender opens a conversation and writes a message.
+    \item The frontend sends recipient and content data to the direct message endpoint.
+    \item The backend verifies both participants and stores the message.
+    \item Conversation summary and unread state are updated.
+    \item The sender interface refreshes the conversation.
+    \item The recipient sees the unread indicator through the badge endpoint.
+\end{enumerate}
+
+\subsection{Administrative Freeze Sequence}
+
+\begin{enumerate}
+    \item The administrator opens a user detail page.
+    \item The admin enters a reason and requests an account freeze.
+    \item The backend verifies administrator authorization and the target user.
+    \item A freeze record is created and the account status is updated.
+    \item An audit log records the actor, target, action, reason, and timestamp.
+    \item The frontend reloads the selected user detail and displays the new status.
+\end{enumerate}
+
+\section{Data Transfer Design}
+
+DTOs separate database entities from API responses. This prevents the frontend from relying directly on persistence structures. For example, a post response can include author name, avatar, comments, reaction summary, and current user reaction without exposing every column of the post entity.
+
+\begin{longtable}{|m{3.5cm}|m{4.7cm}|m{5.5cm}|}
+\hline
+\textbf{DTO category} & \textbf{Examples} & \textbf{Purpose} \\
+\hline
+Authentication DTOs & Register request, login request, auth response. & Validate credentials and return session information. \\
+\hline
+User DTOs & User response, profile update request, search result. & Expose safe identity and profile data. \\
+\hline
+Post DTOs & Post create request, post response, comment request, reaction request. & Support feed operations without leaking entity internals. \\
+\hline
+Messaging DTOs & Conversation response, message response, send message request. & Represent conversation state and message flow. \\
+\hline
+Notification DTOs & Notification response, badge summary. & Represent activity items and unread counters. \\
+\hline
+Moderation DTOs & Score request, moderation result response, appeal response. & Represent AI-assisted decisions and review data. \\
+\hline
+Administration DTOs & Dashboard summary, audit log response, risk summary, user detail response. & Support supervision screens and account actions. \\
+\hline
+\caption{DTO categories}
+\end{longtable}
+
+\section{Frontend Route and Interaction Design}
+
+Routes mirror the responsibilities of the actors. Standard users mostly stay inside the member dashboard, moderators use a review area, and administrators access a separate supervision area. This prevents daily social tasks from being mixed with governance controls.
+
+\begin{longtable}{|m{3.5cm}|m{4.6cm}|m{5.6cm}|}
+\hline
+\textbf{Route area} & \textbf{Representative route} & \textbf{Design role} \\
+\hline
+Authentication & \texttt{/login}, \texttt{/register} & Entry points for visitors and returning members. \\
+\hline
+User dashboard & \texttt{/dashboard} & Private member workspace. \\
+\hline
+Profile & \texttt{/dashboard/profile} & Identity and avatar management. \\
+\hline
+Feed & \texttt{/dashboard/feed} & Community publication and interaction. \\
+\hline
+Search & \texttt{/dashboard/search} & Member discovery. \\
+\hline
+Requests & \texttt{/dashboard/requests} & Incoming and outgoing friend request management. \\
+\hline
+Messenger & \texttt{/dashboard/messages} & Direct conversations. \\
+\hline
+Notifications & \texttt{/dashboard/notifications} & Activity review and read-state control. \\
+\hline
+Moderation & \texttt{/moderation} & Suspicious content review. \\
+\hline
+Administration & \texttt{/admin} & Platform supervision. \\
+\hline
+Admin users & \texttt{/admin/users} & User list, filters, detail view, and role actions. \\
+\hline
+Admin appeals & \texttt{/admin/appeals} & Appeal review and status update. \\
+\hline
+\caption{Frontend route design}
+\end{longtable}
+
+\subsection*{Component Responsibility}
+
+Pages coordinate data loading and user decisions. Reusable components handle repeated interface patterns such as avatars, buttons, cards, status pills, and selects.
+
+\begin{longtable}{|m{3.5cm}|m{5.1cm}|m{5.4cm}|}
+\hline
+\textbf{Component group} & \textbf{Responsibility} & \textbf{Constraint} \\
+\hline
+Authentication forms & Collect credentials and registration data. & Keep validation feedback clear and immediate. \\
+\hline
+Dashboard layout & Provide private navigation and badge display. & Separate member features from governance areas. \\
+\hline
+Profile components & Display identity, avatar, and editable fields. & Keep member identity consistent across screens. \\
+\hline
+Feed components & Display posts, comments, reactions, and composer controls. & Support frequent interaction without confusion. \\
+\hline
+Search and member cards & Display member summaries and actions. & Show enough identity data for safe selection. \\
+\hline
+Messenger components & Display conversations, selected messages, and composer. & Distinguish message ownership and unread state. \\
+\hline
+Moderation components & Display score, action, categories, reason, and snapshot. & Keep evidence visible for review. \\
+\hline
+Admin components & Display users, roles, status, sanctions, appeals, and audit data. & Remain usable on desktop and Android-size screens. \\
+\hline
+Shared controls & Provide common buttons, selects, icons, cards, and empty states. & Keep visual behavior consistent. \\
+\hline
+\caption{Component responsibility design}
+\end{longtable}
+
+\subsection*{Service and State Design}
+
+Angular services act as the data-access layer. Components call services instead of constructing endpoint URLs or duplicating HTTP behavior. Shared state is used only where needed, such as authentication and navigation badges. Local state is used for page-specific concerns, such as a selected admin user or an open mobile popup.
+
+\begin{longtable}{|m{3.4cm}|m{5.2cm}|m{5.5cm}|}
+\hline
+\textbf{Service area} & \textbf{Main operations} & \textbf{Reason for separation} \\
+\hline
+Authentication & Login, logout, registration, current user, token. & Used by guards, navigation, and protected API calls. \\
+\hline
+Users & Profile, avatar, member lookup, search. & Shared by profile, feed, search, and administration views. \\
+\hline
+Posts & Feed loading, create, update, delete, comments, reactions. & Keeps content behavior consistent. \\
+\hline
+Friend requests & Incoming, outgoing, send, accept, reject, cancel. & Maintains one lifecycle for relationship actions. \\
+\hline
+Direct messages & Conversations, messages, send, read cursor. & Separates message behavior from layout. \\
+\hline
+Notifications & List, mark read, mark all read. & Synchronizes notification pages and badges. \\
+\hline
+Navbar badges & Unread messages, unread notifications, pending requests. & Provides compact activity state for navigation. \\
+\hline
+Moderation & Score content and load review data. & Centralizes moderation contracts. \\
+\hline
+Administration & Overview, users, roles, sanctions, appeals, audit logs. & Groups governance operations behind admin authorization. \\
+\hline
+\caption{Frontend services and state}
+\end{longtable}
+
+\section{Moderation Decision Model}
+
+The moderation model converts a text assessment into an operational decision that the rest of the application can understand. The design stores the evidence needed for later review instead of keeping only a final label.
+
+\begin{longtable}{|m{3.2cm}|m{4.8cm}|m{5.8cm}|}
+\hline
+\textbf{Input or output} & \textbf{Meaning} & \textbf{Use in TunSociety} \\
+\hline
+Content snapshot & The evaluated text fragment. & Preserved so reviewers know what was assessed. \\
+\hline
+Content type & Source such as post, comment, profile name, or message. & Helps locate the origin of the issue. \\
+\hline
+Risk categories & Labels such as abuse, hate, spam, scam, threat, or violence. & Shown to moderators and administrators. \\
+\hline
+Score & Normalized risk indication. & Supports action mapping and risk summaries. \\
+\hline
+Reason & Human-readable explanation. & Helps review and appeal decisions. \\
+\hline
+Action & Allow, Flag, or Block. & Determines the next workflow step. \\
+\hline
+User reference & Account linked to the content. & Connects moderation events to user history. \\
+\hline
+Timestamp & Date and time of the result. & Supports chronological inspection. \\
+\hline
+\caption{Moderation decision data}
+\end{longtable}
+
+The action values are limited by design. A small set of decisions is easier for moderators to interpret, easier to test, and easier to explain in the report. Local AI is therefore treated as a support mechanism, while backend policy and human review remain part of the decision chain.
+
+\section{Responsive Interaction Design}
+
+Responsive design is important because the expected users may access the platform from laptops and phones. The administration users page required special attention. On a wide screen, the list and selected user detail can appear together. On an Android-size screen, the same detail content opens as a popup after the administrator taps the Open action.
+
+\begin{longtable}{|m{3.4cm}|m{5.2cm}|m{5.5cm}|}
+\hline
+\textbf{Case} & \textbf{Expected behavior} & \textbf{Design reason} \\
+\hline
+Desktop admin users & User list and detail panel can be visible together. & Wide screens support side-by-side supervision. \\
+\hline
+Mobile admin users & User summaries appear as stacked cards. & Small screens need readable vertical structure. \\
+\hline
+Open action & Tapping Open selects a user and displays detail content. & The action must be usable by touch. \\
+\hline
+Mobile detail popup & The detail card opens above the list. & A side panel would be too narrow. \\
+\hline
+Closing detail & The administrator returns to the same list context. & Filters and browsing context should not be lost. \\
+\hline
+Role control & Role selection remains available inside the popup. & Mobile supervision should keep functional parity. \\
+\hline
+\caption{Responsive administration behavior}
+\end{longtable}
+
+\section{Design Alternatives}
+
+Several choices were considered during conception. A single-folder frontend would have been quick at the beginning, but it would become difficult to navigate as pages and services increase. A feature-oriented Angular organization was selected because each workflow keeps its pages, models, and services close to each other.
+
+On the backend, placing database logic directly in controllers would reduce early files, but it would mix HTTP concerns, validation, authorization, persistence, moderation, and audit logging. The selected design separates controllers, DTOs, services, entities, and persistence configuration.
+
+For moderation, a fully manual workflow would be simpler but would not demonstrate the intelligent support objective of the project. A fully automatic workflow would be unsafe because model output can be wrong. TunSociety therefore uses AI as assistance and stores the result for review.
+
+\section{Data Flow Scenarios}
+
+The main data flows confirm that each layer has a clear role.
+
+\begin{longtable}{|m{3.2cm}|m{10.5cm}|}
+\hline
+\textbf{Scenario} & \textbf{Flow} \\
+\hline
+Login & Credentials move from the form to the authentication endpoint. The backend validates them, creates a token, and returns identity data. The frontend stores the session and updates navigation. \\
+\hline
+Post creation & The composer sends content to the API. The backend validates the user, calls moderation, stores the moderation result, persists the post if allowed by policy, and returns a feed response. \\
+\hline
+Comment creation & The frontend sends post identifier and text. The backend verifies the post, moderates the comment, persists it, and returns comment data. \\
+\hline
+Friend request & A member action sends a target user identifier. The backend checks relationship rules, stores a pending request, and can create notification data. \\
+\hline
+Direct message & The messenger sends recipient and text. The backend validates participants, stores the message, updates read state, and returns message information. \\
+\hline
+Notification read & The notification page marks an item as read. The backend updates state and the frontend refreshes badge counters. \\
+\hline
+Role change & The admin sends a new role. The backend checks authorization, updates the user, writes an audit log, and returns refreshed user data. \\
+\hline
+Freeze action & The administrator sends target user and reason. The backend stores the freeze, changes account status, writes audit information, and returns updated detail. \\
+\hline
+Appeal review & The reviewer sends a decision. The backend validates the role, updates appeal status, records traceability, and refreshes the appeal list. \\
+\hline
+\caption{Important data flow scenarios}
+\end{longtable}
+
+\section{Conclusion}
+
+The conception of TunSociety connects social interaction, moderation, administration, and traceability through a modular architecture. The next chapter explains how these design decisions were realized in the backend, frontend, validation work, deployment preparation, and future improvements.

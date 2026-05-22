@@ -1,0 +1,55 @@
+\documentclass[12pt,a4paper]{report}
+
+\input{preamble}
+
+\begin{document}
+
+\pagenumbering{gobble}
+\input{cover}
+
+\clearpage
+\pagenumbering{roman}
+\setcounter{page}{1}
+\tableofcontents
+\clearpage
+\phantomsection
+\addcontentsline{toc}{chapter}{List of Figures}
+\listoffigures
+\clearpage
+\phantomsection
+\addcontentsline{toc}{chapter}{List of Tables}
+\listoftables
+\clearpage
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\chapter*{Introduction}
+\addcontentsline{toc}{chapter}{Introduction}
+\input{chapters/introduction}
+
+\chapter{General Context and Preliminary Analysis}
+\input{chapters/context_analysis}
+
+\chapter{Conception and Analysis Phase}
+\input{chapters/design}
+
+\chapter{Realization and Implementation Phase}
+\input{chapters/implementation}
+
+\chapter*{Conclusion and Future Works}
+\addcontentsline{toc}{chapter}{Conclusion and Future Works}
+\input{chapters/conclusion}
+
+
+\bibliographystyle{plain}
+\clearpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Bibliography}
+\bibliography{bibliography/references}
+
+\input{webography}
+
+\input{abstract}
+
+\end{document}
