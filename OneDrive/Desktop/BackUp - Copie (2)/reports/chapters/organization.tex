@@ -1,0 +1,33 @@
+This chapter presents the academic and professional context in which the TunSociety project was developed. Since the project is part of a final year engineering curriculum, the host environment is considered from two complementary perspectives: the academic framework that defines the expected competencies, and the practical software engineering environment in which the application was designed and implemented.
+
+\section{Academic Framework}
+
+The project was carried out within the context of a final year project in software engineering and information systems. This type of work is intended to validate the student's ability to analyze a real problem, propose an appropriate technical solution, implement it using modern development tools, and present the result in a structured academic report.
+
+The academic objectives of the project include:
+
+\begin{itemize}
+    \item applying software engineering methods to a complete web application;
+    \item translating functional needs into an organized system design;
+    \item implementing a secure and maintainable application using current technologies;
+    \item documenting the technical choices and evaluating the obtained result;
+    \item demonstrating autonomy, problem-solving ability, and professional communication.
+\end{itemize}
+
+TunSociety responds to these objectives because it covers several important areas of software engineering: user authentication, database modeling, REST API development, frontend component design, role-based authorization, artificial intelligence integration, and system maintainability.
+
+\section{Project Environment}
+
+The development environment of TunSociety is organized around two main parts: a frontend application and a backend API. The frontend is built with Angular and provides the user interface, navigation, forms, dashboards, and interaction screens. The backend is implemented with ASP.NET Core and exposes the APIs consumed by the frontend. It also contains the business rules, database access, authentication services, moderation logic, and integration with the local AI module.
+
+The database layer uses Entity Framework Core with a MySQL database. This choice allows the system to store structured information such as users, posts, comments, reactions, messages, notifications, moderation results, warnings, freezes, appeals, and audit logs. The AI part is connected locally through Ollama and uses the configured Gemma model for moderation support.
+
+\section{Project Scope Within the Host Context}
+
+Within this environment, TunSociety was not limited to a visual prototype. The project aimed to deliver a functional full-stack application with clear separation between presentation, business logic, persistence, and AI-assisted moderation. The scope includes both user-facing social features and supervision features for moderators and administrators.
+
+The application also reflects important engineering concerns expected in a professional context. Authentication is based on JWT tokens, sensitive routes are protected, user roles are normalized, and administrative actions are recorded through audit logs. These elements show that the project considers not only functional behavior, but also maintainability, traceability, and platform governance.
+
+\section{Chapter Conclusion}
+
+The host context of TunSociety provided an opportunity to apply academic knowledge to a complete software project. The application combines web development, database design, security, modular architecture, and artificial intelligence support. This environment justifies the technical choices presented in the following chapters and establishes the foundation for the project analysis.

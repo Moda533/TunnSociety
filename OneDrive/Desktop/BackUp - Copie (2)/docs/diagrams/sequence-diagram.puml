@@ -1,0 +1,80 @@
+@startuml
+actor User
+actor "Admin / Moderator" as Admin
+participant "Angular Frontend" as Frontend
+participant "API Controller\n(Posts / Messages / Users / Requests)" as Controller
+participant "ModerationService" as ModerationService
+participant "AiScoringClient" as AiScoringClient
+database "ApplicationDbContext\n(MySQL)" as Db
+participant "LocalAiService" as LocalAiService
+participant "Ollama Local API" as Ollama
+participant "SanctionService" as SanctionService
+participant "Notification Center\n(User UI)" as NotificationCenter
+participant "Content Status Page\n(My Posts / Moderation Status)" as StatusPage
+
+User -> Frontend : Submit text content
+Frontend -> Controller : HTTP request with content + JWT
+Controller -> Controller : Validate request and access
+Controller -> ModerationService : EvaluateAsync(contentId, content, contentType)
+ModerationService -> AiScoringClient : AnalyzeAsync(content, contentType)
+AiScoringClient -> AiScoringClient : Normalize text and check memory cache
+AiScoringClient -> Db : Query recent abnormal moderation history
+Db --> AiScoringClient : Recent moderation records
+
+alt No reusable result
+  AiScoringClient -> LocalAiService : ModerateAsync(content, contentType)
+  LocalAiService -> Ollama : POST /api/generate\nmodel + prompt + format=json
+  Ollama --> LocalAiService : JSON(decision, categories,\nconfidence, reason)
+  LocalAiService -> LocalAiService : Parse response\nfallback to heuristics if needed
+  LocalAiService --> AiScoringClient : LocalAiModerationResult
+else Similar result reused
+  AiScoringClient -> AiScoringClient : Build assessment from cached/similar history
+end
+
+AiScoringClient --> ModerationService : AiModerationAssessment(score, flags)
+ModerationService -> ModerationService : Determine action\nAllow / Flag / Block
+ModerationService --> Controller : ModerationResult
+Controller -> Db : Save ModerationResult
+Controller -> SanctionService : EvaluateAsync(user, moderationResult)
+SanctionService --> Controller : Warning / Freeze outcome
+
+alt Action = Allow
+  Controller -> Db : Save business data\n(Post / Comment / Message / Profile update)
+  Controller --> Frontend : SubmissionResult<Data>\n+ ModerationFeedback(Allow)
+  Frontend --> User : Display saved content and success feedback
+else Action = Flag or Block
+  Controller -> Db : Save warnings/freezes if needed
+  Controller -> Db : Create persistent moderation notification
+  Controller --> Frontend : SubmissionResult<null>\n+ ModerationFeedback(Flag or Block)
+  Frontend --> User : Display warning popup\nwith moderation reason and Appeal button
+  Frontend -> NotificationCenter : Show persistent notification\n"Content blocked" or "Flagged for review"
+  Frontend -> StatusPage : Show content status\nFlagged or Blocked
+
+  opt User requests human review
+    User -> Frontend : Click Appeal from popup,\nnotification, or status page
+    Frontend -> Controller : POST AppealRequest\nwith optional explanation
+    Controller -> Db : Save AppealRequest / Appeal\nStatus = Open
+    Controller --> Frontend : Appeal submitted
+    Frontend --> User : Show pending review status
+  end
+
+  Admin -> Frontend : Open Appeals / Pending Reviews
+  Frontend -> Controller : Request open appeals
+  Controller -> Db : Load appeal requests\nwith original content and AI classification
+  Db --> Controller : Pending appeal cases
+  Controller --> Frontend : Appeal review list
+  Frontend --> Admin : Display content, AI classification,\nuser explanation, status, actions
+
+  alt Appeal approved
+    Admin -> Frontend : Approve appeal
+    Frontend -> Controller : Update appeal status = Accepted
+    Controller -> Db : Restore/allow content\nand resolve appeal
+    Controller --> Frontend : Appeal accepted
+  else Appeal rejected
+    Admin -> Frontend : Reject appeal
+    Frontend -> Controller : Update appeal status = Rejected
+    Controller -> Db : Keep content blocked\nand resolve appeal
+    Controller --> Frontend : Appeal rejected
+  end
+end
+@enduml

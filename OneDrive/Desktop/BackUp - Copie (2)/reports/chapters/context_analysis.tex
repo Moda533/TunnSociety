@@ -1,0 +1,465 @@
+\section{Introduction}
+
+The analysis begins by defining the starting point of TunSociety. It explains the academic and practical environment of the work, the problem that motivated the application, the actors involved, the requirements retained for the first version, and the method used to organize development. The analysis is centered on one idea: the value of TunSociety comes from serving structured communities that need communication and supervision at the same time.
+
+\section{Presentation of the Host Organization}
+
+\subsection{Host Context}
+
+TunSociety was developed as a final year project in software engineering and information systems. The academic framework required more than a simple demonstration screen. The project had to identify a realistic problem, translate it into functional needs, design an architecture, implement a working solution, and document the result with enough detail to justify the technical choices.
+
+The practical context was the construction of a complete web application. During the project, the work covered account management, frontend screens, backend APIs, database persistence, authorization rules, moderation support, administration workflows, and validation scenarios. This made the project close to a professional full-stack development task, even though it remained an academic implementation.
+
+\subsection{Development Activities}
+
+The activities carried out during the project were organized around the complete software life cycle. The work started with the identification of the target users and continued with requirement analysis, database modeling, API design, Angular interface development, ASP.NET Core implementation, manual validation, and report writing.
+
+The project required the following competencies:
+
+\begin{itemize}
+    \item analyzing the needs of a community-oriented web platform;
+    \item separating ordinary member features from moderation and administration features;
+    \item modeling persistent data for users, posts, messages, notifications, sanctions, appeals, and audit logs;
+    \item protecting private actions through authentication, role checks, and backend authorization;
+    \item integrating local AI support without making it the only decision maker;
+    \item documenting design, implementation, testing, and future improvements.
+\end{itemize}
+
+\section{Project Scope}
+
+\subsection{Problem Statement}
+
+Public platforms such as Facebook, LinkedIn, Reddit, Discord, and X already provide communication tools. However, their objectives are broad and their governance rules are controlled by the platform owner. A small student club or association may need a more focused environment where membership, content, decisions, and account status remain under local supervision.
+
+The need addressed by TunSociety is therefore not the creation of another general social website. The need is a controlled digital workspace for groups that have identifiable members and responsible actors. Members must be able to communicate normally, while moderators and administrators must be able to follow risky behavior, record decisions, and preserve accountability.
+
+The central question can be written as follows:
+
+\begin{quote}
+How can a web application support Tunisian student clubs, associations, and local communities by combining daily social interaction with role-based governance, moderation, and traceable administration?
+\end{quote}
+
+\subsection{Comparative Positioning}
+
+Existing platforms are useful references because they show the social habits users already understand. They are less appropriate as a direct model because their controls are not designed for a small organization that wants its own moderation history, local account status, and internal audit records.
+
+\input{tables/comparison}
+
+This comparison clarifies the product position. TunSociety keeps familiar actions such as posting, commenting, messaging, and searching members, but it adds mechanisms that are normally missing from a simple feed: local roles, moderation records, warnings, freezes, appeals, and audit logs.
+
+\subsection{Proposed Solution}
+
+The proposed solution is a web platform dedicated to structured communities. It provides a private member space for everyday interaction and a supervision space for actors who manage trust and safety.
+
+The first version includes the following services:
+
+\begin{itemize}
+    \item registration, login, JWT-based authentication, and password hashing;
+    \item profile consultation, profile update, avatar display, and member pages;
+    \item feed publication, comments, reactions, and post visibility;
+    \item member search and friend request lifecycle;
+    \item direct messages, conversations, unread states, and notifications;
+    \item local AI-assisted moderation for submitted text;
+    \item moderator review of suspicious content;
+    \item administrator dashboards, user details, role changes, warnings, freezes, appeals, risk summaries, and audit logs.
+\end{itemize}
+
+The selected stack is Angular for the client application, ASP.NET Core for the REST API, Entity Framework Core for data access, MySQL for persistence, and Ollama with Gemma for local moderation support.
+
+\section{Requirement Analysis}
+
+\subsection{Actors Identification}
+
+Three main actors are defined in the system.
+
+\begin{longtable}{|m{3cm}|m{10.8cm}|}
+\hline
+\textbf{Actor} & \textbf{Role in TunSociety} \\
+\hline
+Visitor & A person who has not yet authenticated. The visitor can create an account or log in if an account already exists. \\
+\hline
+Standard User & A member of the community. This actor manages a profile, publishes and interacts with posts, searches members, handles friend requests, sends messages, and follows notifications. \\
+\hline
+Moderator & A trusted actor who reviews moderation information and suspicious content. The moderator supports safety decisions but does not manage the entire platform configuration. \\
+\hline
+Administrator & The actor responsible for supervision. The administrator manages users, roles, warnings, freezes, appeals, risk information, dashboard indicators, and audit logs. \\
+\hline
+\caption{Actors of the TunSociety platform}
+\end{longtable}
+
+\subsection{Functional Requirements}
+
+The functional requirements are grouped by workflow rather than by screen. This makes the relation between user needs and implementation clearer.
+
+\begin{longtable}{|m{3.1cm}|m{8.8cm}|m{2cm}|}
+\hline
+\textbf{Area} & \textbf{Requirement} & \textbf{Priority} \\
+\hline
+Account access & Create accounts with validated identity data, secure passwords, duplicate email checks, and protected login. & High \\
+\hline
+Authentication & Return JWT tokens after successful login and use them to protect private API calls. & High \\
+\hline
+Profile & Let members consult and update their personal information and avatar. & High \\
+\hline
+Member discovery & Allow users to search for other members and open member profile pages. & Medium \\
+\hline
+Community feed & Support post creation, display, update, deletion, comments, reactions, and visibility rules. & High \\
+\hline
+Relationship workflow & Manage friend requests with pending, accepted, rejected, and cancelled states. & Medium \\
+\hline
+Messaging & Allow members to exchange direct messages and consult conversation histories. & Medium \\
+\hline
+Unread state & Track unread messages, pending requests, and unread notifications for navigation badges. & Medium \\
+\hline
+Moderation scoring & Evaluate submitted text, assign categories, calculate risk, and choose an allow, flag, or block action. & High \\
+\hline
+Moderation review & Give moderators and administrators access to moderation results and suspicious content information. & High \\
+\hline
+Administration & Display user lists, user details, roles, account status, sanctions, appeals, dashboard indicators, and audit logs. & High \\
+\hline
+Traceability & Store important moderation and administration events so later review is possible. & High \\
+\hline
+Responsive behavior & Keep member and administrator workflows usable on desktop and Android-size screens. & Medium \\
+\hline
+\caption{Functional requirements by workflow}
+\end{longtable}
+
+\subsection{Non-functional Requirements}
+
+Because TunSociety handles identity, private communication, and administrative decisions, the non-functional requirements are as important as the visible features.
+
+\begin{longtable}{|m{3.2cm}|m{10.5cm}|}
+\hline
+\textbf{Quality} & \textbf{Expected behavior} \\
+\hline
+Security & Passwords must not be stored in clear text. Private pages and sensitive endpoints must require authentication and role authorization. \\
+\hline
+Privacy & The first version uses local AI moderation to avoid sending member text to an external AI service during development. \\
+\hline
+Reliability & Backend validation must reject invalid operations, protect relationships between entities, and preserve database consistency. \\
+\hline
+Traceability & Warnings, freezes, appeal reviews, role changes, and important moderation events must remain available for later inspection. \\
+\hline
+Maintainability & Frontend and backend code must be organized by responsibility so that future changes can be localized. \\
+\hline
+Usability & Members should reach frequent actions quickly, and administrators should be able to inspect account details without losing context. \\
+\hline
+Extensibility & The architecture should allow real-time delivery, richer moderation, analytics, OAuth, and deployment automation in later versions. \\
+\hline
+\caption{Non-functional requirements}
+\end{longtable}
+
+\subsection{Global Use Case Diagram}
+
+The global use case diagram summarizes the main actions available to each actor. Standard users interact with account, profile, feed, search, request, message, and notification features. Moderators focus on review. Administrators supervise accounts and decisions.
+
+\begin{figure}[H]
+\centering
+\fbox{
+\begin{minipage}{0.9\textwidth}
+\centering
+\begin{tabular}{|m{3cm}|m{10.2cm}|}
+\hline
+\textbf{Actor} & \textbf{Main use cases} \\
+\hline
+Visitor & Register account, log in. \\
+\hline
+User & Manage profile, publish posts, comment, react, search members, manage friend requests, exchange messages, read notifications. \\
+\hline
+Moderator & Review moderation results, inspect risky content, follow appeal information. \\
+\hline
+Administrator & Manage users, update roles, issue warnings, freeze accounts, review appeals, inspect dashboards, risk summaries, and audit logs. \\
+\hline
+\end{tabular}
+\end{minipage}
+}
+\caption{Global use case diagram of TunSociety}
+\end{figure}
+
+\subsection{Class Diagram}
+
+The class diagram represents the entities that support the application. The central entity is the user because it is connected to social activity, communication, moderation records, sanctions, appeals, and audit events.
+
+\begin{figure}[H]
+\centering
+\fbox{
+\begin{minipage}{0.9\textwidth}
+\centering
+\begin{tabular}{|m{4cm}|m{9.2cm}|}
+\hline
+\textbf{Central entity} & User: identity, credentials, role, status, avatar, profile data. \\
+\hline
+\textbf{Social entities} & Post, PostComment, PostReaction, FriendRequest. \\
+\hline
+\textbf{Communication entities} & DirectMessage, DirectMessageReadCursor, CommunityNotification. \\
+\hline
+\textbf{Governance entities} & ModerationResult, Warning, Freeze, Appeal, AuditLog. \\
+\hline
+\end{tabular}
+\end{minipage}
+}
+\caption{Main class diagram of TunSociety}
+\end{figure}
+
+\subsection*{Target Community}
+
+TunSociety is intended for small and medium communities where members are known or can be identified by the organization. The main examples are student clubs, university associations, cultural groups, local initiatives, and internal community teams. These groups do not only need public visibility. They also need a place where members can communicate under rules decided by the organization.
+
+\begin{longtable}{|m{3.2cm}|m{5.2cm}|m{5.5cm}|}
+\hline
+\textbf{Target group} & \textbf{Observed need} & \textbf{TunSociety response} \\
+\hline
+Student club members & Share updates and interact with peers. & Posts, comments, reactions, profiles, and notifications. \\
+\hline
+Club leaders & Keep communication organized and supervise members. & User lists, roles, dashboard indicators, and account status controls. \\
+\hline
+Moderators & Focus on content that may require review. & AI scoring, flags, categories, reasons, and review screens. \\
+\hline
+Administrators & Justify decisions and preserve a decision history. & Warnings, freezes, appeals, audit logs, and risk summaries. \\
+\hline
+New members & Discover people and begin controlled interaction. & Search, member pages, friend requests, and direct messages. \\
+\hline
+\caption{Target community needs and platform response}
+\end{longtable}
+
+\subsection*{Detailed Requirement Catalogue}
+
+The catalogue below records the most important functional expectations in a form that can be checked against the implementation.
+
+\begin{longtable}{|m{1.8cm}|m{8.6cm}|m{2.4cm}|m{1.8cm}|}
+\hline
+\textbf{Code} & \textbf{Requirement} & \textbf{Actor} & \textbf{Priority} \\
+\hline
+FR-01 & Register a visitor with email, full name, gender, age, password, and confirmation after validation. & Visitor & High \\
+\hline
+FR-02 & Reject invalid registration data, including weak passwords, duplicate email, invalid age, and missing fields. & Visitor & High \\
+\hline
+FR-03 & Moderate display names during account creation to reduce inappropriate identities. & System & Medium \\
+\hline
+FR-04 & Authenticate a user and return a valid token for private requests. & User & High \\
+\hline
+FR-05 & Protect accounts from repeated failed login attempts. & System & High \\
+\hline
+FR-06 & Maintain the configured administrator account for platform supervision. & Admin & High \\
+\hline
+FR-07 & Display and update member profile information and avatar data. & User & High \\
+\hline
+FR-08 & Search members and open safe profile summaries. & User & Medium \\
+\hline
+FR-09 & Create, edit, delete, and display community posts with optional media. & User & High \\
+\hline
+FR-10 & Add comments and reactions to posts. & User & High \\
+\hline
+FR-11 & Send, accept, reject, and cancel friend requests. & User & Medium \\
+\hline
+FR-12 & Send direct messages and consult conversation history. & User & Medium \\
+\hline
+FR-13 & Track read states and unread counters. & User & Medium \\
+\hline
+FR-14 & Create, display, and mark notifications as read. & User & Medium \\
+\hline
+FR-15 & Score submitted content with AI support and fallback rules. & System & High \\
+\hline
+FR-16 & Classify risk with categories such as abuse, hate, spam, scam, threat, and violence. & System & High \\
+\hline
+FR-17 & Store moderation results with score, action, reason, categories, snapshot, and timestamp. & System & High \\
+\hline
+FR-18 & Let moderators inspect flagged or risky content. & Moderator & High \\
+\hline
+FR-19 & Let administrators list users, inspect details, and update roles. & Admin & High \\
+\hline
+FR-20 & Let administrators issue warnings, freeze accounts, unfreeze accounts, and review appeals. & Admin & High \\
+\hline
+FR-21 & Record important decisions in audit logs. & System & High \\
+\hline
+FR-22 & Display dashboard indicators and user risk summaries. & Admin & Medium \\
+\hline
+FR-23 & Keep the interface readable on desktop and mobile screens. & User & Medium \\
+\hline
+\caption{Functional requirement catalogue}
+\end{longtable}
+
+\subsection*{User Stories}
+
+User stories were used to keep the requirements connected to practical expectations.
+
+\begin{longtable}{|m{2.8cm}|m{8.2cm}|m{3cm}|}
+\hline
+\textbf{Actor} & \textbf{Story} & \textbf{Value} \\
+\hline
+Visitor & As a visitor, I want to create a valid account so that I can join the community. & Access \\
+\hline
+User & As a member, I want my profile and avatar to identify me across the platform. & Identity \\
+\hline
+User & As a member, I want to publish and discuss posts so that community information is shared in one place. & Communication \\
+\hline
+User & As a member, I want to search people and send requests so that I can build my internal network. & Discovery \\
+\hline
+User & As a member, I want private messages and unread counters so that I can coordinate without missing activity. & Coordination \\
+\hline
+Moderator & As a moderator, I want risky content to be organized with score and reason so that review is faster. & Safety \\
+\hline
+Administrator & As an administrator, I want sanctions and role changes to be traceable so that decisions can be justified. & Governance \\
+\hline
+Administrator & As an administrator, I want the user detail page to work on mobile so that supervision is possible from a phone. & Usability \\
+\hline
+Maintainer & As a maintainer, I want modular code and documented contracts so that future changes are easier to apply. & Maintenance \\
+\hline
+\caption{Representative user stories}
+\end{longtable}
+
+\subsection*{Governance Rules}
+
+The governance aspect is what gives TunSociety its specific direction. The platform is not limited to a feed; it also defines how responsible actors can react when behavior creates risk.
+
+\begin{longtable}{|m{3.4cm}|m{5.1cm}|m{5.3cm}|}
+\hline
+\textbf{Rule} & \textbf{Meaning} & \textbf{System support} \\
+\hline
+Stable identity & A member should be linked to a recognizable account and profile. & Registration, profile fields, avatar, and member pages. \\
+\hline
+Role separation & Ordinary participation and supervision must be handled by different permissions. & User, Moderator, and Admin roles with guarded routes and backend checks. \\
+\hline
+Content accountability & Content should remain linked to an author and moderation context. & Posts, comments, moderation results, and content snapshots. \\
+\hline
+Progressive response & A minor issue and a serious issue should not receive the same reaction. & Allow, flag, block, warnings, freezes, and appeals. \\
+\hline
+Human review & Sensitive situations should remain visible to responsible actors. & Moderation views, admin details, appeal screens, and audit logs. \\
+\hline
+Local control & The community should not depend entirely on external platform governance. & Local database, role management, and local AI-assisted moderation. \\
+\hline
+\caption{Governance rules supported by TunSociety}
+\end{longtable}
+
+\subsection*{Community Lifecycle}
+
+A community platform is used over time. Members join, build identity, discover other members, publish, coordinate, and sometimes require supervision. This lifecycle helped organize the feature priorities.
+
+\begin{longtable}{|m{3.1cm}|m{5.4cm}|m{5.7cm}|}
+\hline
+\textbf{Phase} & \textbf{Expectation} & \textbf{Feature response} \\
+\hline
+Joining & The user needs a controlled entry point. & Registration, login, validation, and token access. \\
+\hline
+Identity & The member needs to be recognizable. & Profile information, avatar, and member cards. \\
+\hline
+Discovery & The member needs to find people. & Search and member profile pages. \\
+\hline
+Connection & The member needs controlled relationships. & Friend request states and actions. \\
+\hline
+Participation & The member needs to share updates. & Posts, comments, reactions, and feed refresh. \\
+\hline
+Coordination & The member needs private communication. & Direct messages and conversations. \\
+\hline
+Awareness & The member needs to follow changes. & Notifications and navigation badges. \\
+\hline
+Supervision & Responsible actors need to react to risk. & Moderation results, warnings, freezes, appeals, and audit logs. \\
+\hline
+\caption{Community lifecycle supported by the platform}
+\end{longtable}
+
+\section{Project Methodology}
+
+\subsection{Kanban-Based Organization}
+
+The project was organized with an iterative workflow inspired by Kanban and Agile principles \cite{sommerville}. This approach was appropriate because TunSociety is composed of connected modules that could still be developed progressively. Authentication and persistence were handled first because every private feature depends on them. Social features, messaging, moderation, and administration were then added in controlled increments.
+
+The repeated working cycle was:
+
+\begin{itemize}
+    \item define the next concrete feature;
+    \item identify the required entities, DTOs, endpoints, and screens;
+    \item implement backend behavior and persistence;
+    \item connect Angular services and components;
+    \item test the feature through a realistic scenario;
+    \item correct problems before expanding the scope.
+\end{itemize}
+
+\subsection{Product Backlog}
+
+The backlog grouped the work into feature areas and helped maintain priority.
+
+\begin{longtable}{|m{3.5cm}|m{8.4cm}|m{2.2cm}|}
+\hline
+\textbf{Backlog item} & \textbf{Content} & \textbf{Priority} \\
+\hline
+Authentication & Registration, login, password rules, token generation, administrator account, and guards. & High \\
+\hline
+Profiles & Current profile, profile update, avatar, member pages, and safe member summaries. & High \\
+\hline
+Feed & Posts, comments, reactions, media support, visibility, and moderation before persistence. & High \\
+\hline
+Networking & Search, friend request creation, acceptance, rejection, and cancellation. & Medium \\
+\hline
+Messaging & Conversations, direct messages, read cursors, and unread states. & Medium \\
+\hline
+Notifications & Notification list, read state, read-all action, and navigation badges. & Medium \\
+\hline
+Moderation & AI scoring, fallback rules, stored results, flagged content, warnings, freezes, and appeals. & High \\
+\hline
+Administration & Dashboard indicators, user details, role changes, sanctions, risk summaries, and audit logs. & High \\
+\hline
+Responsiveness & Mobile-friendly user cards, admin detail popup, and readable dashboard layouts. & Medium \\
+\hline
+\caption{Project backlog}
+\end{longtable}
+
+\subsection{Task Management with Trello}
+
+Trello was used as a practical board for the Kanban workflow. Cards represented concrete tasks such as creating an entity, adding an endpoint, building a page, wiring an Angular service, testing a scenario, or improving a report section. The board helped separate tasks that were still planned, tasks being implemented, tasks under verification, and completed work.
+
+The main benefits were clearer progress visibility, better prioritization of foundation features, and easier tracking of corrections. It also helped avoid expanding the scope before the central flows were stable.
+
+\subsection*{Scope Prioritization}
+
+Scope control was necessary because a community application can easily grow into unrelated directions. The first version kept the features that directly support the controlled-community objective.
+
+\begin{longtable}{|m{3cm}|m{3.6cm}|m{7cm}|}
+\hline
+\textbf{Priority} & \textbf{Feature group} & \textbf{Reason} \\
+\hline
+Critical & Authentication and roles & Private and administrative workflows cannot be trusted without identity and authorization. \\
+\hline
+Critical & Persistence & Posts, messages, sanctions, appeals, and audit logs must survive application restart. \\
+\hline
+High & Profile and feed & These features create the daily community experience for members. \\
+\hline
+High & Moderation and administration & These features define the product difference and support governance. \\
+\hline
+Medium & Requests, messages, and notifications & These features improve coordination and member awareness. \\
+\hline
+Medium & Responsive admin UI & Small-screen supervision is important for local organizations where administrators may use phones. \\
+\hline
+Future & Real-time delivery and analytics & Useful for maturity, but not required to prove the first controlled-community version. \\
+\hline
+\caption{Scope prioritization}
+\end{longtable}
+
+\subsection*{Risk Management}
+
+The project contained technical, usability, and positioning risks. Risk analysis helped keep the work coherent.
+
+\begin{longtable}{|m{3.3cm}|m{4.9cm}|m{5.8cm}|}
+\hline
+\textbf{Risk} & \textbf{Impact} & \textbf{Mitigation} \\
+\hline
+Unclear positioning & The project could appear to be a normal social media clone. & Keep the report and implementation focused on structured communities, roles, moderation, and traceability. \\
+\hline
+Weak authorization & Sensitive actions could be reachable by the wrong actor. & Use route guards and backend role checks for moderator and administrator operations. \\
+\hline
+AI service unavailable & Moderation could fail during demonstrations or tests. & Add fallback rules and store controlled moderation responses. \\
+\hline
+Inconsistent contracts & Frontend screens could receive data in unexpected shapes. & Use DTOs, typed Angular models, and consistent service methods. \\
+\hline
+Mobile admin failure & Administrators could be unable to inspect details on small screens. & Implement a popup detail view for Android-size user cards. \\
+\hline
+Insufficient traceability & Sanctions and role changes could be difficult to justify. & Persist audit logs, warnings, freezes, appeals, and moderation records. \\
+\hline
+Excessive feature growth & The project could become too broad for a final year scope. & Prioritize features that support communication plus governance. \\
+\hline
+\caption{Project risks and mitigation}
+\end{longtable}
+
+\section{Conclusion}
+
+This analysis established the foundation of TunSociety. The platform is designed for organized Tunisian communities that need both member interaction and local governance. The requirements, target users, lifecycle, backlog, and risks all support this direction. The next chapter translates these needs into the conception and analysis of the system architecture, modules, data model, API contracts, and interaction flows.
